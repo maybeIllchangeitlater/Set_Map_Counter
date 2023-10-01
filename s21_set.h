@@ -58,6 +58,16 @@ public:
     using difference_type = ptrdiff_t;
 //    using is_always_equal =	std::true_type;
     /**
+     * @brief all memory allocated during tree lifecycle gets yeeted here
+     */
+    ~MyTreeAllocator(){
+        int n = for_deletion_.size();
+        for(int i = 0; i < n; ++i){
+            std::cout << "ABOBA DOESNT LEAK" << std::endl;
+            ::operator delete[](for_deletion_[i]);
+        }
+    }
+    /**
      * @brief rebind T to node T
      */
     template <typename U>
