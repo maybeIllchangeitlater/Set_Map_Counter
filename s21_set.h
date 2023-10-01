@@ -56,7 +56,7 @@ public:
     using const_reference = const value_type&;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-    using is_always_equal =	std::true_type;
+//    using is_always_equal =	std::true_type;
     /**
      * @brief rebind T to node T
      */
@@ -70,24 +70,31 @@ public:
      * @brief gets called only for Node
      * reallocs 1.5 if no allocate memory left otherwise takes empty(left) node, puts it to the right
      * and returns it
+     * make sure n is 1
      */
     //        if(!n) throw std::bad_alloc(); add it! make it safe!
-    [[nodiscard]] pointer allocate(const size_type n = 1){
-        if(!reusable_ || !reusable_->left) {
-            for_deletion_.push_back(static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
 
-            reusable_ ? reusable_->left = &(for_deletion_.back()[0]) : reusable_ = &(for_deletion_.back()[0]);
+    [[nodiscard]] pointer allocate(const size_type n){
+        std::cout << "ABOBA ALLOCATES" << std::endl;
+        if(!reusable_ || !reusable_->left) {
+            std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
+            for_deletion_.push_back(static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
 
             for(int i = 1; i < allocate_this_; ++i)
                 for_deletion_.back()[i].left = &(for_deletion_.back()[i-1]);
 
+            reusable_ ? reusable_->left = &(for_deletion_.back()[allocate_this_ - 1]) :
+                    reusable_ = &(for_deletion_.back()[allocate_this_ - 1]);
+
             allocate_this_ *= alloc_factor_;
         }
-        reusable_->left->right = reusable_->right;
-        reusable_->right = reusable_->left;
-        reusable_->left = reusable_->left->left;
 
-        return reusable_->right;
+        auto ret = reusable_->left;
+        reusable_->left = reusable_->left->left;
+        ret->left = nullptr;
+
+
+        return ret;
     }
 
     /**
@@ -106,6 +113,7 @@ public:
      */
     template <typename U, typename... Args>
     void construct(U* ptr, Args&&... args){
+        std::cout << "ABOBA CONSTRUCTS" << std::endl;;
         new (ptr) U(std::forward<Args>(args)...);
     }
 
@@ -131,21 +139,6 @@ private:
     std::vector<pointer> for_deletion_; //questionable if it will call operator delete[]. Needs testing, possible replacement with hand mande
 
 
-//    static size_type max_size()
-//    { return (std::numeric_limits<size_type>::max)(); }
-//    using allocator_type = Alloc;
-//    value_type	Alloc::value_type
-//    pointer	Alloc::pointer if present, otherwise value_type*
-//    const_pointer	Alloc::const_pointer if present, otherwise std::pointer_traits<pointer>::rebind<const value_type>
-//    void_pointer	Alloc::void_pointer if present, otherwise std::pointer_traits<pointer>::rebind<void>
-//    const_void_pointer	Alloc::const_void_pointer if present, otherwise std::pointer_traits<pointer>::rebind<const void>
-//    difference_type	Alloc::difference_type if present, otherwise std::pointer_traits<pointer>::difference_type
-//    size_type	Alloc::size_type if present, otherwise std::make_unsigned<difference_type>::type
-//    propagate_on_container_copy_assignment	Alloc::propagate_on_container_copy_assignment if present, otherwise std::false_type
-//    propagate_on_container_move_assignment	Alloc::propagate_on_container_move_assignment if present, otherwise std::false_type
-//    propagate_on_container_swap	Alloc::propagate_on_container_swap if present, otherwise std::false_type
-//    is_always_equal	Alloc::is_always_equal if present, otherwise std::is_empty<Alloc>::type
-
 };
 
 template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
@@ -159,7 +152,8 @@ public:
         Node *left = nullptr;
         Node *right = nullptr;
     };
-    using NodeAlloc = typename Alloc::template rebind<Node>::other;
+    using allocator_type = Alloc;
+    using NodeAlloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
     using key_type = const T;
     using value_type = const T;
     using reference = const T &;
@@ -294,8 +288,9 @@ public:
         if (it != end()) {
             return std::make_pair(it, false);
         } else {
-            Node * target = node_alloc_.allocate();
-            alloc_.construct(&(target->key), value);
+            Node * target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
+//            alloc_.construct(&(target->key), value);
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
             root_ = Insert(root_, target);
             ++size_;
             return std::make_pair(find(value), true);
