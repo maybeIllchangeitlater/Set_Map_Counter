@@ -56,7 +56,6 @@ public:
     using const_reference = const value_type&;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-//    using is_always_equal =	std::true_type;
     /**
      * @brief all memory allocated during tree lifecycle gets yeeted here
      */
@@ -81,6 +80,7 @@ public:
      * reallocs 1.5 if no allocate memory left otherwise takes empty(left) node, puts it to the right
      * and returns it
      * make sure n is 1
+     * prehaps smarter move to make use of n?
      */
     //        if(!n) throw std::bad_alloc(); add it! make it safe!
 
@@ -113,6 +113,7 @@ public:
      * implies call to destroy for T beforehands
      */
     void deallocate(const pointer ptr, const size_type n){
+        std::cout << "ABOBA REUSES" << std::endl;
         ptr->left = reusable_->left;
         reusable_->left = ptr;
     }
@@ -132,6 +133,7 @@ public:
      * Only gets called for T
      */
     void destroy(const pointer ptr){
+        std::cout << "ABOBA YEETS T" << std::endl;
         ptr->~T();
     }
 
@@ -252,12 +254,12 @@ public:
 
     set(std::initializer_list<value_type> const &items) : set() {
         for (const auto &v: items)
-            insert(v);
+            Append(v);
     }
 
     set(const set &s) : set() {
         for (const auto &v: s)
-            insert(v);
+            Append(v);
     }
 
     set(set &&s)  noexcept : set() {
@@ -267,19 +269,24 @@ public:
         node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
     }
 
+    /**
+     * @brief rewrite
+     */
     set &operator=(const set &s) {
         if(this == s)
             return *this;
-        clear();
+        clear(); //cringe dont do dis. or maybe it's k in this specific case
         for (const auto &v: s)
-            insert(v);
+            Append(v);
         return *this;
     }
-
+    /**
+     * @brief rewrite
+     */
     set &operator=(set &&s)  noexcept {
         if(this == s)
             return *this;
-        clear();
+        clear(); //cringe dont do dis (here its actually the fucking worst)
         size_ = std::exchange(s.size_, size_);
         root_ = std::exchange(s.root_, root_);
         alloc_ = std::exchange(s.alloc_, alloc_);
@@ -288,7 +295,6 @@ public:
     }
 
     virtual ~set() = default;
-//        clear();
     /**
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
@@ -299,7 +305,6 @@ public:
             return std::make_pair(it, false);
         } else {
             Node * target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-//            alloc_.construct(&(target->key), value);
             std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
             root_ = Insert(root_, target);
             ++size_;
@@ -397,7 +402,17 @@ protected:
         }
         return tmp;
     }
-
+    /**
+     * @brief check for node, create node, insert node.
+     */
+    void Append(reference value){
+        if(!contains(value)) {
+            Node *target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            root_ = Insert(root_, target);
+            ++size_;
+        }
+    }
     /**
     * @brief Recursively searches for place to insert leaf and balances tree from bottoms up
     * If node already exist will do nothing but attempting few rebalances; Prefereably find first;
