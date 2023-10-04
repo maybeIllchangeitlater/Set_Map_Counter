@@ -8,6 +8,7 @@
 #include <utility>
 #include <iostream> //delete later
 #include <queue>
+#include <type_traits>
 
 //template<typename T>
 //class SetIterator;
@@ -18,6 +19,8 @@ struct MyComparator {
         return lhs < rhs;
     }
 }; //no real reason, just for fun.
+
+
 //
 //    template<typename Iterator>
 //    struct iterator_traits {
@@ -45,7 +48,7 @@ struct MyComparator {
 //        using reference = const T &;
 //        using iterator_category = random_access_iterator_tag;
 //    };
-
+//static_assert("boba" == "aboba");
 template<typename T>
 class MyTreeAllocator final{
 public:
@@ -56,16 +59,16 @@ public:
     using const_reference = const value_type&;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-    /**
-     * @brief all memory allocated during tree lifecycle gets yeeted here
-     */
+    using is_always_equal = std::true_type;
+    using propagate_on_container_swap = std::false_type;
+    using propagate_on_container_move_assignment = std::true_type;
+    using propagate_on_container_copy_assignment = std::false_type;
+
+//    constexpr typename std::enable_if_t<std::is_class<T>::value>
     ~MyTreeAllocator(){
-        int n = for_deletion_.size();
-        for(int i = 0; i < n; ++i){
-            std::cout << "ABOBA DOESNT LEAK" << std::endl;
-            ::operator delete[](for_deletion_[i]);
-        }
+        ::operator delete(pool_);
     }
+
     /**
      * @brief rebind T to node T
      */
@@ -82,28 +85,17 @@ public:
      * make sure n is 1
      * prehaps smarter move to make use of n?
      */
-    //        if(!n) throw std::bad_alloc(); add it! make it safe!
 
-    [[nodiscard]] pointer allocate(const size_type n){
-        std::cout << "ABOBA ALLOCATES" << std::endl;
-        if(!reusable_ || !reusable_->left) {
-            std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
-            for_deletion_.push_back(static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
-
-            for(int i = 1; i < allocate_this_; ++i)
-                for_deletion_.back()[i].left = &(for_deletion_.back()[i-1]);
-
-            reusable_ ? reusable_->left = &(for_deletion_.back()[allocate_this_ - 1]) :
-                    reusable_ = &(for_deletion_.back()[allocate_this_ - 1]);
-
-            allocate_this_ *= alloc_factor_;
-        }
+    [[nodiscard]]static pointer allocate(const size_type n){
+        std::cout << "ABOBA GIBS MEMORY" << std::endl;
+        if(!reusable_ || !reusable_->left)
+            pool_ ? realloc_pool(n) : init_pool(n);
 
         auto ret = reusable_->left;
         reusable_->left = reusable_->left->left;
         ret->left = nullptr;
-
-
+        ret->parent = nullptr;
+        ret->right = nullptr;
         return ret;
     }
 
@@ -112,7 +104,7 @@ public:
      * moves node to the left from reusable so it can be reused again
      * implies call to destroy for T beforehands
      */
-    void deallocate(const pointer ptr, const size_type n){
+    static void deallocate(const pointer ptr, const size_type n){
         std::cout << "ABOBA REUSES" << std::endl;
         ptr->left = reusable_->left;
         reusable_->left = ptr;
@@ -123,7 +115,7 @@ public:
      * with default implementation from allocator_traits
      */
     template <typename U, typename... Args>
-    void construct(U* ptr, Args&&... args){
+    static void construct(U* ptr, Args&&... args){
         std::cout << "ABOBA CONSTRUCTS" << std::endl;;
         new (ptr) U(std::forward<Args>(args)...);
     }
@@ -132,28 +124,56 @@ public:
      * @brief can be replaced with default allocator_traits implementation
      * Only gets called for T
      */
-    void destroy(const pointer ptr){
-        std::cout << "ABOBA YEETS T" << std::endl;
+    static void destroy(const pointer ptr){
+        std::cout << "ABOBA YEETS " << *ptr << std::endl;
         ptr->~T();
     }
 
 
-    bool operator==(const MyTreeAllocator &) const { return true; } //questionalbe, allocators are not stateless
-    bool operator!=(const MyTreeAllocator &) const { return false; }
+//    bool operator==(const MyTreeAllocator &) const { return true; } //questionalbe, allocators are not stateless
+//    bool operator!=(const MyTreeAllocator &) const { return false; }
 
-    pointer address(reference r) { return &r; } //very questionable
-    const_pointer address(const_reference s) { return &s; }
+    static pointer address(reference r) { return &r; } //very questionable
+    static const_pointer address(const_reference s) { return &s; }
 
 private:
-    constexpr static const float alloc_factor_ = 1.5;
-    size_type allocate_this_ = 10;
-    pointer reusable_ = nullptr;
-    std::vector<pointer> for_deletion_; //questionable if it will call operator delete[]. Needs testing, possible replacement with hand mande
+    static void init_pool(const size_type n){
+        std::cout << "ABOBA INITS MEMORY" << std::endl;
+        pool_ = static_cast<value_type *>(::operator new(sizeof(value_type) * allocated_ * n));
+        auto temp_pool = pool_;
+        temp_pool += allocated_;
+        reusable_ = temp_pool++;
+        for(int i = 1; i < allocated_; ++i){
+            auto temp_node = reusable_->left;
+            reusable_->left = temp_pool++;
+            reusable_->left->left = temp_node;
+        }
+    }
 
+    static void realloc_pool(const size_type n){
+        std::cout << "ABOBA CREATE NEW POOL" << std::endl;
+        auto new_pool = static_cast<value_type *>(::operator new(sizeof(value_type) * allocated_ * kAlloc_factor_ * n));
+        std::memcpy(new_pool, pool_, allocated_);
+        ::operator delete(pool_);
+        allocated_ *= kAlloc_factor_;
+        auto temp_pool = pool_;
+        reusable_ = temp_pool++;
+        for(int i = 1; i < allocated_; ++i){
+            auto temp_node = reusable_->left;
+            reusable_->left = temp_pool++;
+            reusable_->left->left = temp_node;
+        }
 
+    }
+
+    constexpr static const float kAlloc_factor_ = 1.5;
+    inline static size_type allocated_ = 10;
+    inline static pointer pool_ = nullptr;
+    inline static pointer reusable_ = nullptr;
 };
 
-template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
+
+    template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
 class set {
 public:
 
@@ -168,8 +188,8 @@ public:
     using NodeAlloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
     using key_type = const T;
     using value_type = const T;
-    using reference = const T &;
-    using const_reference = const T &;
+    using reference = value_type &;
+    using const_reference = const value_type &;
     using size_type = size_t;
 
     class SetIterator {
@@ -265,36 +285,33 @@ public:
     set(set &&s)  noexcept : set() {
         size_ = std::exchange(s.size_, size_);
         root_ = std::exchange(s.root_, root_);
-        alloc_ = std::exchange(s.alloc_, alloc_);
-        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
+//        alloc_ = std::exchange(s.alloc_, alloc_);
+//        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
     }
 
-    /**
-     * @brief rewrite
-     */
     set &operator=(const set &s) {
         if(this == s)
             return *this;
-        clear(); //cringe dont do dis. or maybe it's k in this specific case
+        clear();
         for (const auto &v: s)
             Append(v);
         return *this;
     }
-    /**
-     * @brief rewrite
-     */
+
     set &operator=(set &&s)  noexcept {
         if(this == s)
             return *this;
-        clear(); //cringe dont do dis (here its actually the fucking worst)
+        clear();
         size_ = std::exchange(s.size_, size_);
         root_ = std::exchange(s.root_, root_);
-        alloc_ = std::exchange(s.alloc_, alloc_);
-        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
+//        alloc_ = std::exchange(s.alloc_, alloc_);
+//        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
         return *this;
     }
 
-    virtual ~set() = default;
+    virtual ~set(){
+        clear();
+    };
     /**
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
@@ -304,8 +321,7 @@ public:
         if (it != end()) {
             return std::make_pair(it, false);
         } else {
-            Node * target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            Node* target = allocate_and_construct(value);
             root_ = Insert(root_, target);
             ++size_;
             return std::make_pair(find(value), true);
@@ -330,11 +346,11 @@ public:
      * @brief returns iterator to position of node with input value or iterator to end
      */
     iterator find(reference &value) const noexcept {
-        return iterator(search(value));
+        return iterator(Search(value));
     }
 
     bool contains(reference value) const noexcept{
-        return search(value);
+        return Search(value);
     }
 
     /**
@@ -381,15 +397,55 @@ public:
     }
 
     void clear() {
-        while (root_)
-            root_ = Delete(root_, root_->key);
+        if(root_) ClearNodes(root_);
+        root_ = nullptr;
+        size_ = 0;
     }
 
 protected:
+    Node* allocate_and_construct(reference value){
+        try {
+//            Node *target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
+            Node* target = NodeAlloc::allocate(1);
+            allocator_type ::construct(&(target->key), value);
+//            Node * target = node_alloc_.allocate(1);
+//            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            return target;
+        } catch (...){
+            clear();
+            throw;
+        }
+    }
+
+    void destruct_and_deallocate(Node* target){
+        allocator_type::destroy(&(target->key));
+        NodeAlloc::deallocate(target, 1);
+//        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->key));
+//        std::allocator_traits<NodeAlloc>::deallocate(node_alloc_, target, 1);
+    }
+    /**
+     * @brief recursively clears everything to the right and to the left from node before clearing the node
+     */
+    void ClearNodes(Node* root){
+        if(root->left) {
+            if(!root->left->left&& !root->left->right){
+                destruct_and_deallocate(root->left);
+            }
+            else ClearNodes(root->left);
+        }
+        if(root->right) {
+            if(!root->right->left && !root->right->right){
+                destruct_and_deallocate(root->right);
+            }
+            else ClearNodes(root->right);
+        }
+
+        destruct_and_deallocate(root);
+    }
     /**
      * @brief preforms binary search for Node of value
      */
-    Node *search(reference &value) const noexcept {
+    Node *Search(reference &value) const noexcept {
         Node *tmp = root_;
         while (tmp) {
             if (comparator_(value, tmp->key)) {
@@ -407,8 +463,7 @@ protected:
      */
     void Append(reference value){
         if(!contains(value)) {
-            Node *target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            Node* target = allocate_and_construct(value);
             root_ = Insert(root_, target);
             ++size_;
         }
@@ -459,8 +514,7 @@ protected:
                 if (needs_father_figure) {
                     needs_father_figure->parent = nullptr;
                 }
-                alloc_.destroy(&(root->key));
-                node_alloc_.deallocate(root_);
+                destruct_and_deallocate(root);
                 return needs_father_figure;
             }
             Node *new_root = FindLeftmost(root->right);
@@ -469,8 +523,7 @@ protected:
             if (new_root->right) new_root->right->parent = new_root;
             new_root->left = root->left;
             if (new_root->right) new_root->right->parent = new_root;
-            alloc_.destroy(&(root->key));
-            node_alloc_.deallocate(root_);
+            destruct_and_deallocate(root);
             return Balance(new_root);
         }
 
@@ -565,12 +618,13 @@ protected:
 
 
 //    private:
+
     size_type size_;
     Node *root_;
     Compare comparator_;
-    Alloc alloc_;
-    NodeAlloc node_alloc_;
-//    int size_;
+//    Alloc alloc_;
+//    NodeAlloc node_alloc_;
+
 };
 
 };
