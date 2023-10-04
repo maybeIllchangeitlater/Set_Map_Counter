@@ -3,12 +3,13 @@
 
 #include <algorithm>
 #include <initializer_list>
-#include <memory>
+
 #include <iterator>
 #include <utility>
-#include <iostream> //delete later
-#include <queue>
+
 #include <type_traits>
+#include <cstring>
+#include "TreeAllocator.h"
 
 //template<typename T>
 //class SetIterator;
@@ -49,128 +50,7 @@ struct MyComparator {
 //        using iterator_category = random_access_iterator_tag;
 //    };
 //static_assert("boba" == "aboba");
-template<typename T>
-class MyTreeAllocator final{
-public:
-    using value_type = T;
-    using pointer = value_type*;
-    using const_pointer = const value_type*;
-    using reference = value_type&;
-    using const_reference = const value_type&;
-    using size_type = size_t;
-    using difference_type = ptrdiff_t;
-    using is_always_equal = std::true_type;
-    using propagate_on_container_swap = std::false_type;
-    using propagate_on_container_move_assignment = std::true_type;
-    using propagate_on_container_copy_assignment = std::false_type;
 
-//    constexpr typename std::enable_if_t<std::is_class<T>::value>
-    ~MyTreeAllocator(){
-        ::operator delete(pool_);
-    }
-
-    /**
-     * @brief rebind T to node T
-     */
-    template <typename U>
-    struct rebind
-    {
-        using other = MyTreeAllocator<U>;
-    };
-
-    /**
-     * @brief gets called only for Node
-     * reallocs 1.5 if no allocate memory left otherwise takes empty(left) node, puts it to the right
-     * and returns it
-     * make sure n is 1
-     * prehaps smarter move to make use of n?
-     */
-
-    [[nodiscard]]static pointer allocate(const size_type n){
-        std::cout << "ABOBA GIBS MEMORY" << std::endl;
-        if(!reusable_ || !reusable_->left)
-            pool_ ? realloc_pool(n) : init_pool(n);
-
-        auto ret = reusable_->left;
-        reusable_->left = reusable_->left->left;
-        ret->left = nullptr;
-        ret->parent = nullptr;
-        ret->right = nullptr;
-        return ret;
-    }
-
-    /**
-     * @brief doesn't dealloc anything. Only called for Node T
-     * moves node to the left from reusable so it can be reused again
-     * implies call to destroy for T beforehands
-     */
-    static void deallocate(const pointer ptr, const size_type n){
-        std::cout << "ABOBA REUSES" << std::endl;
-        ptr->left = reusable_->left;
-        reusable_->left = ptr;
-    }
-
-    /**
-     * @brief placement new. Only gets called for T. No logic here, can be replaced
-     * with default implementation from allocator_traits
-     */
-    template <typename U, typename... Args>
-    static void construct(U* ptr, Args&&... args){
-        std::cout << "ABOBA CONSTRUCTS" << std::endl;;
-        new (ptr) U(std::forward<Args>(args)...);
-    }
-
-    /**
-     * @brief can be replaced with default allocator_traits implementation
-     * Only gets called for T
-     */
-    static void destroy(const pointer ptr){
-        std::cout << "ABOBA YEETS " << *ptr << std::endl;
-        ptr->~T();
-    }
-
-
-//    bool operator==(const MyTreeAllocator &) const { return true; } //questionalbe, allocators are not stateless
-//    bool operator!=(const MyTreeAllocator &) const { return false; }
-
-    static pointer address(reference r) { return &r; } //very questionable
-    static const_pointer address(const_reference s) { return &s; }
-
-private:
-    static void init_pool(const size_type n){
-        std::cout << "ABOBA INITS MEMORY" << std::endl;
-        pool_ = static_cast<value_type *>(::operator new(sizeof(value_type) * allocated_ * n));
-        auto temp_pool = pool_;
-        temp_pool += allocated_;
-        reusable_ = temp_pool++;
-        for(int i = 1; i < allocated_; ++i){
-            auto temp_node = reusable_->left;
-            reusable_->left = temp_pool++;
-            reusable_->left->left = temp_node;
-        }
-    }
-
-    static void realloc_pool(const size_type n){
-        std::cout << "ABOBA CREATE NEW POOL" << std::endl;
-        auto new_pool = static_cast<value_type *>(::operator new(sizeof(value_type) * allocated_ * kAlloc_factor_ * n));
-        std::memcpy(new_pool, pool_, allocated_);
-        ::operator delete(pool_);
-        allocated_ *= kAlloc_factor_;
-        auto temp_pool = pool_;
-        reusable_ = temp_pool++;
-        for(int i = 1; i < allocated_; ++i){
-            auto temp_node = reusable_->left;
-            reusable_->left = temp_pool++;
-            reusable_->left->left = temp_node;
-        }
-
-    }
-
-    constexpr static const float kAlloc_factor_ = 1.5;
-    inline static size_type allocated_ = 10;
-    inline static pointer pool_ = nullptr;
-    inline static pointer reusable_ = nullptr;
-};
 
 
     template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
@@ -185,7 +65,7 @@ public:
         Node *right = nullptr;
     };
     using allocator_type = Alloc;
-    using NodeAlloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
+    using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
     using key_type = const T;
     using value_type = const T;
     using reference = value_type &;
@@ -406,10 +286,10 @@ protected:
     Node* allocate_and_construct(reference value){
         try {
 //            Node *target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-            Node* target = NodeAlloc::allocate(1);
-            allocator_type ::construct(&(target->key), value);
-//            Node * target = node_alloc_.allocate(1);
-//            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+//            Node* target = NodeAlloc::allocate(1);
+//            allocator_type ::construct(&(target->key), value);
+            Node * target = node_alloc_.allocate(1);
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
             return target;
         } catch (...){
             clear();
@@ -418,10 +298,10 @@ protected:
     }
 
     void destruct_and_deallocate(Node* target){
-        allocator_type::destroy(&(target->key));
-        NodeAlloc::deallocate(target, 1);
-//        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->key));
-//        std::allocator_traits<NodeAlloc>::deallocate(node_alloc_, target, 1);
+//        allocator_type::destroy(&(target->key));
+//        NodeAlloc::deallocate(target, 1);
+        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->key));
+        std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, target, 1);
     }
     /**
      * @brief recursively clears everything to the right and to the left from node before clearing the node
@@ -622,8 +502,9 @@ protected:
     size_type size_;
     Node *root_;
     Compare comparator_;
-//    Alloc alloc_;
-//    NodeAlloc node_alloc_;
+    allocator_type_node node_alloc_;
+    allocator_type alloc_;
+
 
 };
 
