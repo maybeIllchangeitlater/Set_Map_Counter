@@ -3,11 +3,12 @@
 
 #include <algorithm>
 #include <initializer_list>
-#include <memory>
+
 #include <iterator>
 #include <utility>
 #include <iostream> //delete later
 #include <queue>
+#include <TreeAllocator.h>
 
 //template<typename T>
 //class SetIterator;
@@ -46,112 +47,7 @@ struct MyComparator {
 //        using iterator_category = random_access_iterator_tag;
 //    };
 
-template<typename T>
-class MyTreeAllocator final{
-public:
-    using value_type = T;
-    using pointer = value_type*;
-    using const_pointer = const value_type*;
-    using reference = value_type&;
-    using const_reference = const value_type&;
-    using size_type = size_t;
-    using difference_type = ptrdiff_t;
-    /**
-     * @brief all memory allocated during tree lifecycle gets yeeted here
-     */
-    ~MyTreeAllocator(){
-        int n = for_deletion_.size();
-        for(int i = 0; i < n; ++i){
-            std::cout << "ABOBA DOESNT LEAK" << std::endl;
-            ::operator delete[](for_deletion_[i]);
-        }
-    }
-    /**
-     * @brief rebind T to node T
-     */
-    template <typename U>
-    struct rebind
-    {
-        using other = MyTreeAllocator<U>;
-    };
 
-    /**
-     * @brief gets called only for Node
-     * reallocs 1.5 if no allocate memory left otherwise takes empty(left) node, puts it to the right
-     * and returns it
-     * make sure n is 1
-     * prehaps smarter move to make use of n?
-     */
-    //        if(!n) throw std::bad_alloc(); add it! make it safe!
-
-    [[nodiscard]] pointer allocate(const size_type n){
-        std::cout << "ABOBA ALLOCATES" << std::endl;
-        if(!reusable_ || !reusable_->left) {
-            std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
-            for_deletion_.push_back(static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
-
-            for(int i = 1; i < allocate_this_; ++i)
-                for_deletion_.back()[i].left = &(for_deletion_.back()[i-1]);
-
-            reusable_ ? reusable_->left = &(for_deletion_.back()[allocate_this_ - 1]) :
-                    reusable_ = &(for_deletion_.back()[allocate_this_ - 1]);
-
-            allocate_this_ *= alloc_factor_;
-        }
-
-        auto ret = reusable_->left;
-        reusable_->left = reusable_->left->left;
-        ret->left = nullptr;
-
-
-        return ret;
-    }
-
-    /**
-     * @brief doesn't dealloc anything. Only called for Node T
-     * moves node to the left from reusable so it can be reused again
-     * implies call to destroy for T beforehands
-     */
-    void deallocate(const pointer ptr, const size_type n){
-        std::cout << "ABOBA REUSES" << std::endl;
-        ptr->left = reusable_->left;
-        reusable_->left = ptr;
-    }
-
-    /**
-     * @brief placement new. Only gets called for T. No logic here, can be replaced
-     * with default implementation from allocator_traits
-     */
-    template <typename U, typename... Args>
-    void construct(U* ptr, Args&&... args){
-        std::cout << "ABOBA CONSTRUCTS" << std::endl;;
-        new (ptr) U(std::forward<Args>(args)...);
-    }
-
-    /**
-     * @brief can be replaced with default allocator_traits implementation
-     * Only gets called for T
-     */
-    void destroy(const pointer ptr){
-        std::cout << "ABOBA YEETS T" << std::endl;
-        ptr->~T();
-    }
-
-
-    bool operator==(const MyTreeAllocator &) const { return true; } //questionalbe, allocators are not stateless
-    bool operator!=(const MyTreeAllocator &) const { return false; }
-
-    pointer address(reference r) { return &r; } //very questionable
-    const_pointer address(const_reference s) { return &s; }
-
-private:
-    constexpr static const float alloc_factor_ = 1.5;
-    size_type allocate_this_ = 10;
-    pointer reusable_ = nullptr;
-    std::vector<pointer> for_deletion_; //questionable if it will call operator delete[]. Needs testing, possible replacement with hand mande
-
-
-};
 
 template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
 class set {
