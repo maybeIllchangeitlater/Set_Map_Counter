@@ -7,7 +7,7 @@
 #include <iterator>
 #include <utility>
 #include <iostream> //delete later
-#include <queue>
+#include <type_traits>
 #include "TreeAllocator.h"
 
 //template<typename T>
@@ -19,37 +19,10 @@ struct MyComparator {
         return lhs < rhs;
     }
 }; //no real reason, just for fun.
-//
-//    template<typename Iterator>
-//    struct iterator_traits {
-//        using value_type = typename Iterator::value_type;
-//        using difference_type = typename Iterator::difference_type;
-//        using pointer = typename Iterator::pointer;
-//        using reference = typename Iterator::reference;
-//        using iterator_category = typename Iterator::iterator_category;
-//    };
-//
-//    template<typename T>
-//    struct iterator_traits<T *> {
-//        using value_type = T;
-//        using difference_type = ptrdiff_t;
-//        using pointer = const T*;
-//        using reference = const T&;
-//        using iterator_category = std::bidirectional_iterator_tag;
-//    };
-//
-//    template<typename T>
-//    struct iterator_traits<const T *> {
-//        using value_type = T;
-//        using difference_type = ptrdiff_t;
-//        using pointer = const T *;
-//        using reference = const T &;
-//        using iterator_category = random_access_iterator_tag;
-//    };
 
 
 
-template<typename T, typename Compare = MyComparator<T>, typename Alloc = MyTreeAllocator<T>>
+template<typename T, typename Compare = MyComparator<T>, typename Allocator = MyTreeAllocator<T>>
 class set {
 public:
 
@@ -59,12 +32,15 @@ public:
         Node *parent = nullptr;
         Node *left = nullptr;
         Node *right = nullptr;
+        Node() : height(1), parent(nullptr), left(nullptr), right(nullptr){}
     };
-    using allocator_type = Alloc;
-    using NodeAlloc = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
+    using allocator_type = Allocator;
+    using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
     using key_type = const T;
-    using value_type = const T;
+    using value_type = key_type;
     using reference = const T &;
+    using key_compare = Compare;
+    using value_compare = key_compare;
     using const_reference = const T &;
     using size_type = size_t;
 
@@ -146,7 +122,28 @@ public:
     using iterator = SetIterator;
     using const_iterator = SetIterator;
 
-    set() noexcept : size_(0), root_(nullptr) {};
+
+    set() : size_(0), root_(nullptr), comparator_(), alloc_(), node_alloc_() {}
+
+    /**
+     * @brief Wont compile if alloc type and template alloc are different;
+     * As per allocator requirements all allocators related by rebind
+     * maintain each other's resources, such as memory pools therefore rebound alloc
+     * can be constructed through non-rebound alloc
+     * @param comp instance of template type
+     * @param alloc instance of template type or default constructed template alloc by default
+     */
+    explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0), root_(nullptr),
+    comparator_(comp), alloc_(alloc), node_alloc_(alloc){}
+
+    /**
+     * @brief Wont compile if alloc type and template alloc are different;
+     * As per allocator requirements all allocators related by rebind
+     * maintain each other's resources, such as memory pools therefore rebound alloc
+     * can be constructed through non-rebound alloc
+     * @param alloc instance of template type
+     */
+    explicit set(const Allocator& alloc ) : size_(0), root_(nullptr), comparator_(), alloc_(alloc), node_alloc_(alloc){}
 
     set(std::initializer_list<value_type> const &items) : set() {
         for (const auto &v: items)
@@ -171,7 +168,7 @@ public:
     set &operator=(const set &s) {
         if(this == s)
             return *this;
-        clear(); //cringe dont do dis. or maybe it's k in this specific case
+        clear();
         for (const auto &v: s)
             Append(v);
         return *this;
@@ -182,7 +179,7 @@ public:
     set &operator=(set &&s)  noexcept {
         if(this == s)
             return *this;
-        clear(); //cringe dont do dis (here its actually the fucking worst)
+        clear();
         size_ = std::exchange(s.size_, size_);
         root_ = std::exchange(s.root_, root_);
         alloc_ = std::exchange(s.alloc_, alloc_);
@@ -190,7 +187,9 @@ public:
         return *this;
     }
 
-    virtual ~set() = default;
+    virtual ~set(){
+        clear();
+    };
     /**
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
@@ -200,8 +199,7 @@ public:
         if (it != end()) {
             return std::make_pair(it, false);
         } else {
-            Node * target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            Node * target = AllocateAndConstruct(value);
             root_ = Insert(root_, target);
             ++size_;
             return std::make_pair(find(value), true);
@@ -226,11 +224,11 @@ public:
      * @brief returns iterator to position of node with input value or iterator to end
      */
     iterator find(reference &value) const noexcept {
-        return iterator(search(value));
+        return iterator(Search(value));
     }
 
     bool contains(reference value) const noexcept{
-        return search(value);
+        return Search(value);
     }
 
     /**
@@ -277,15 +275,64 @@ public:
     }
 
     void clear() {
-        while (root_)
-            root_ = Delete(root_, root_->key);
+        ClearNodes(root_);
+        size_ = 0;
+    }
+
+    constexpr typename std::enable_if<std::is_copy_constructible<key_compare>::value, key_compare>::type key_comp() const {
+        return comparator_;
+    }
+
+    constexpr typename std::enable_if<std::is_copy_constructible<value_compare>::value, key_compare>::type value_comp() const {
+        return comparator_;
+    }
+    constexpr allocator_type get_allocator()const noexcept{
+        return alloc_;
     }
 
 protected:
+    Node* AllocateAndConstruct(reference value){
+        try {
+            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+            target->left = nullptr;
+            target->right = nullptr;
+            target->parent = nullptr;
+            target->height = 1;
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            return target;
+        } catch (...){
+            clear();
+            throw;
+        }
+    }
+
+    void DestructAndDeallocate(Node* target){
+        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->key));
+        std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, target, 1);
+    }
+    /**
+     * @brief recursively clears everything to the right and to the left from node before clearing the node
+     */
+    void ClearNodes(Node* root){
+        if(root->left) {
+            if(!root->left->left&& !root->left->right){
+               DestructAndDeallocate(root->left);
+            }
+            else ClearNodes(root->left);
+        }
+        if(root->right) {
+            if(!root->right->left && !root->right->right){
+                DestructAndDeallocate(root->right);
+            }
+            else ClearNodes(root->right);
+        }
+
+        DestructAndDeallocate(root);
+    }
     /**
      * @brief preforms binary search for Node of value
      */
-    Node *search(reference &value) const noexcept {
+    Node *Search(reference &value) const noexcept {
         Node *tmp = root_;
         while (tmp) {
             if (comparator_(value, tmp->key)) {
@@ -303,8 +350,7 @@ protected:
      */
     void Append(reference value){
         if(!contains(value)) {
-            Node *target = std::allocator_traits<NodeAlloc>::allocate(node_alloc_, 1);
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            Node* target = AllocateAndConstruct(value);
             root_ = Insert(root_, target);
             ++size_;
         }
@@ -355,8 +401,7 @@ protected:
                 if (needs_father_figure) {
                     needs_father_figure->parent = nullptr;
                 }
-                alloc_.destroy(&(root->key));
-                node_alloc_.deallocate(root_);
+                DestructAndDeallocate(root);
                 return needs_father_figure;
             }
             Node *new_root = FindLeftmost(root->right);
@@ -365,8 +410,7 @@ protected:
             if (new_root->right) new_root->right->parent = new_root;
             new_root->left = root->left;
             if (new_root->right) new_root->right->parent = new_root;
-            alloc_.destroy(&(root->key));
-            node_alloc_.deallocate(root_);
+            DestructAndDeallocate(root);
             return Balance(new_root);
         }
 
@@ -463,9 +507,14 @@ protected:
 //    private:
     size_type size_;
     Node *root_;
+    /**
+     * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
+     */
     Compare comparator_;
-    Alloc alloc_;
-    NodeAlloc node_alloc_;
+    allocator_type alloc_;
+    allocator_type_node node_alloc_;
+
+
 //    int size_;
 };
 
