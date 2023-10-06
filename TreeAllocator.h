@@ -106,7 +106,7 @@ namespace s21 {
                 for_deletion_.push_back(
                         static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
 
-                for (int i = 1; i < allocate_this_ * n; ++i)
+                for (size_type i = 1; i < allocate_this_ * n; ++i)
                     for_deletion_.back()[i].__left_ = &(for_deletion_.back()[i - 1]);
 
                 reusable_ ? reusable_->__left_ = &(for_deletion_.back()[allocate_this_ - 1]) :
@@ -130,6 +130,7 @@ namespace s21 {
          */
         void deallocate(const pointer ptr, const size_type n) {
             std::cout << "ABOBA REUSES" << std::endl;
+            if(n){}
             ptr->__left_ = reusable_->__left_;
             reusable_->__left_ = ptr;
         }
