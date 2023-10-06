@@ -5,6 +5,11 @@
 #include <vector>
 #include <iostream>
 #include <ctype.h>
+
+/**
+ * @brief usable with LLVM (clang++) compiler tree structures but not with GNU (GCC) compilers
+ * due to how rbtree is implemented
+ */
 namespace s21 {
     template<typename T>
     class MyTreeAllocator final {
