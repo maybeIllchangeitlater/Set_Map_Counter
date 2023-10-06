@@ -30,9 +30,8 @@ public:
         T key;
         size_t height = 1;
         Node *parent = nullptr;
-        Node *left = nullptr;
+        Node *__left_ = nullptr;
         Node *right = nullptr;
-        Node() : height(1), parent(nullptr), left(nullptr), right(nullptr){}
     };
     using allocator_type = Allocator;
     using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
@@ -85,10 +84,10 @@ public:
         *  if it doesn't go up until you either encounter left(unvisited) node or nullptr
         */
         iterator operator--() {
-            if (n_->left) {
-                n_ = FindRightmost(n_->left);
+            if (n_->__left_) {
+                n_ = FindRightmost(n_->__left_);
             } else {
-                while (n_->parent && n_->parent->left == n_) {
+                while (n_->parent && n_->parent->__left_ == n_) {
                     n_ = n_->parent;
                 }
                 n_ = n_->parent;
@@ -117,6 +116,7 @@ public:
 
     protected:
         Node *n_;
+        friend class s21::set<T>;
     };
 
     using iterator = SetIterator;
@@ -194,7 +194,7 @@ public:
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
      */
-    std::pair<iterator, bool> insert(reference value) {
+    std::pair<iterator, bool> insert(const value_type& value) {
         auto it = find(value);
         if (it != end()) {
             return std::make_pair(it, false);
@@ -203,6 +203,37 @@ public:
             root_ = Insert(root_, target);
             ++size_;
             return std::make_pair(find(value), true);
+        }
+    }
+    /**
+     * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
+     * to existing node
+     */
+    std::pair<iterator, bool> insert(value_type&& value){
+        auto it = find(value);
+        if (it != end()) {
+            return std::make_pair(it, false);
+        } else {
+            Node * target = AllocateAndConstruct(value);
+            root_ = Insert(root_, target);
+            ++size_;
+            return std::make_pair(find(value), true);
+        }
+    };
+    /**
+     * @brief insert elements in range of iterator first to iterator second into a tree
+     */
+    template<class InputIt>
+    void insert(InputIt first, InputIt last){
+        if constexpr (std::is_base_of_v<std::input_iterator_tag, typename std::iterator_traits<InputIt>::iterator_category>) {
+            for (InputIt it = first; it != last;++it){
+                Append(*it);
+            }
+        }
+    }
+    void insert( std::initializer_list<value_type> ilist ){
+        for(auto & v: ilist){
+            Append(v);
         }
     }
     /**
@@ -266,6 +297,14 @@ public:
         return iterator(nullptr);
     }
 
+    const_iterator cbegin(){
+        return const_iterator(FindLeftmost(root_));
+    }
+
+    const_iterator cend(){
+        return const_iterator(nullptr);
+    }
+
     bool empty() const noexcept{
         return !size_;
     }
@@ -291,10 +330,10 @@ public:
     }
 
 protected:
-    Node* AllocateAndConstruct(reference value){
+    Node* AllocateAndConstruct(value_type &value){
         try {
-            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-            target->left = nullptr;
+            Node *target = static_cast<Node*>(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1));
+            target->__left_ = nullptr;
             target->right = nullptr;
             target->parent = nullptr;
             target->height = 1;
@@ -314,14 +353,14 @@ protected:
      * @brief recursively clears everything to the right and to the left from node before clearing the node
      */
     void ClearNodes(Node* root){
-        if(root->left) {
-            if(!root->left->left&& !root->left->right){
-               DestructAndDeallocate(root->left);
+        if(root->__left_) {
+            if(!root->__left_->__left_&& !root->__left_->right){
+               DestructAndDeallocate(root->__left_);
             }
-            else ClearNodes(root->left);
+            else ClearNodes(root->__left_);
         }
         if(root->right) {
-            if(!root->right->left && !root->right->right){
+            if(!root->right->__left_ && !root->right->right){
                 DestructAndDeallocate(root->right);
             }
             else ClearNodes(root->right);
@@ -336,7 +375,7 @@ protected:
         Node *tmp = root_;
         while (tmp) {
             if (comparator_(value, tmp->key)) {
-                tmp = tmp->left;
+                tmp = tmp->__left_;
             } else if (comparator_(tmp->key, value)) {
                 tmp = tmp->right;
             } else {
@@ -348,7 +387,7 @@ protected:
     /**
      * @brief check for node, create node, insert node.
      */
-    void Append(reference value){
+    void Append(value_type& value){
         if(!contains(value)) {
             Node* target = AllocateAndConstruct(value);
             root_ = Insert(root_, target);
@@ -364,8 +403,8 @@ protected:
             return target;
         }
         if (comparator_(target->key, root->key)) {
-            root->left = Insert(root->left, target);
-            root->left->parent = root;
+            root->__left_ = Insert(root->__left_, target);
+            root->__left_->parent = root;
         } else if (comparator_(root->key, target->key)) {
             root->right = Insert(root->right, target);
             root->right->parent = root;
@@ -386,9 +425,9 @@ protected:
             return nullptr;
         }
         if (comparator_(value, root->key)) {
-            root->left = Delete(root->left, value);
-            if (root->left) {
-                root->left->parent = root;
+            root->__left_ = Delete(root->__left_, value);
+            if (root->__left_) {
+                root->__left_->parent = root;
             }
         } else if (comparator_(root->key, value)) {
             root->right = Delete(root->right, value);
@@ -396,8 +435,8 @@ protected:
                 root->right->parent = root;
             }
         } else {
-            if (!root->left || !root->right) {
-                Node *needs_father_figure = root->left ? root->left : root->right;
+            if (!root->__left_ || !root->right) {
+                Node *needs_father_figure = root->__left_ ? root->__left_ : root->right;
                 if (needs_father_figure) {
                     needs_father_figure->parent = nullptr;
                 }
@@ -408,7 +447,7 @@ protected:
             new_root->parent = nullptr;
             new_root->right = RebalanceFromLeft(root->right);
             if (new_root->right) new_root->right->parent = new_root;
-            new_root->left = root->left;
+            new_root->__left_ = root->__left_;
             if (new_root->right) new_root->right->parent = new_root;
             DestructAndDeallocate(root);
             return Balance(new_root);
@@ -431,8 +470,8 @@ protected:
             return RotateLeft(root);
         }
         if (BalanceFactor(root) < -1) {
-            if (BalanceFactor(root->left) > 0) {
-                root->left = RotateLeft(root->left);
+            if (BalanceFactor(root->__left_) > 0) {
+                root->__left_ = RotateLeft(root->__left_);
             }
             return RotateRight(root);
         }
@@ -446,10 +485,10 @@ protected:
     */
     Node *RotateLeft(Node *root) noexcept {
         Node *tmp = root->right;
-        root->right = tmp->left;
+        root->right = tmp->__left_;
         tmp->parent = root->parent;
-        if (tmp->left) tmp->left->parent = root;
-        tmp->left = root;
+        if (tmp->__left_) tmp->__left_->parent = root;
+        tmp->__left_ = root;
         root->parent = tmp;
         FixHeight(root);
         FixHeight(tmp);
@@ -462,8 +501,8 @@ protected:
     *
     */
     Node *RotateRight(Node *root) noexcept {
-        Node *tmp = root->left;
-        root->left = tmp->right;
+        Node *tmp = root->__left_;
+        root->__left_ = tmp->right;
         tmp->parent = root->parent;
         if (tmp->right) tmp->right->parent = root;
         tmp->right = root;
@@ -475,13 +514,13 @@ protected:
     }
 
     void FixHeight(Node *root) noexcept {
-        size_type left_h = Height(root->left);
+        size_type left_h = Height(root->__left_);
         size_type right_h = Height(root->right);
         root->height = std::max(left_h, right_h) + 1;
     }
 
     int BalanceFactor(Node *root) const noexcept {
-        return Height(root->right) - Height(root->left);
+        return Height(root->right) - Height(root->__left_);
     }
 
     size_type Height(Node *root) const noexcept {
@@ -489,7 +528,7 @@ protected:
     }
 
     static Node *FindLeftmost(Node *root) {
-        return root->left ? FindLeftmost(root->left) : root;
+        return root->__left_ ? FindLeftmost(root->__left_) : root;
     }
 
     static Node *FindRightmost(Node *root) {
@@ -497,9 +536,9 @@ protected:
     }
 
     Node *RebalanceFromLeft(Node *root) {
-        if (!root->left)
+        if (!root->__left_)
             return root->right;
-        root->left = RebalanceFromLeft(root->left);
+        root->__left_ = RebalanceFromLeft(root->__left_);
         return Balance(root);
     }
 

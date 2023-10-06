@@ -17,6 +17,8 @@ namespace s21 {
         using size_type = size_t;
         using difference_type = ptrdiff_t;
         using is_always_equal = std::false_type;
+        using void_pointer = void*;
+        using const_void_pointer = const void_pointer;
 
 
         MyTreeAllocator() noexcept {
@@ -58,8 +60,6 @@ namespace s21 {
 
         };
 
-        //as for rebinded allocator mantaining the same pool, it's beyond me as
-
         /**
          * @brief all memory allocated during trees lifecycles gets yeeted here
          */
@@ -96,26 +96,26 @@ namespace s21 {
                 throw std::bad_alloc();
             }
             std::cout << "ABOBA ALLOCATES" << std::endl;
-            if (!reusable_ || !reusable_->left) {
+            if (!reusable_ || !reusable_->__left_) {
                 std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
                 for_deletion_.push_back(
                         static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
 
                 for (int i = 1; i < allocate_this_ * n; ++i)
-                    for_deletion_.back()[i].left = &(for_deletion_.back()[i - 1]);
+                    for_deletion_.back()[i].__left_ = &(for_deletion_.back()[i - 1]);
 
-                reusable_ ? reusable_->left = &(for_deletion_.back()[allocate_this_ - 1]) :
+                reusable_ ? reusable_->__left_ = &(for_deletion_.back()[allocate_this_ - 1]) :
                         reusable_ = &(for_deletion_.back()[allocate_this_ - 1]);
 
                 allocate_this_ *= alloc_factor_ * n;
             }
 
-            auto ret = reusable_->left;
-            reusable_->left = reusable_->left->left;
-            ret->left = nullptr;
+            auto ret = reusable_->__left_;
+            reusable_->__left_ = reusable_->__left_->__left_;
+            ret->__left_ = nullptr;
 
 
-            return ret;
+            return static_cast<pointer>(ret);
         }
 
         /**
@@ -125,8 +125,8 @@ namespace s21 {
          */
         void deallocate(const pointer ptr, const size_type n) {
             std::cout << "ABOBA REUSES" << std::endl;
-            ptr->left = reusable_->left;
-            reusable_->left = ptr;
+            ptr->__left_ = reusable_->__left_;
+            reusable_->__left_ = ptr;
         }
 
         /**
