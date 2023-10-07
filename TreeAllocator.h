@@ -1,5 +1,5 @@
-#ifndef S21_CONTAINERS_S21_TREEALLOCATOR_H_
-#define S21_CONTAINERS_S21_TREEALLOCATOR_H_
+#ifndef S21_CONTAINERS_TREEALLOCATOR_H_
+#define S21_CONTAINERS_TREEALLOCATOR_H_
 
 #include <memory>
 #include <vector>
@@ -7,8 +7,7 @@
 #include <ctype.h>
 
 /**
- * @brief usable with LLVM (clang++) compiler tree structures but not with GNU (GCC) compilers
- * due to how rbtree is implemented
+ * @brief usable with LLVM (clang++) compiler RBTrees but not with GNU (GCC) compilers
  */
 namespace s21 {
     template<typename T>
@@ -105,7 +104,7 @@ namespace s21 {
                 std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
                 for_deletion_.push_back(
                         static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
-
+                for_deletion_.back()[0].__left_ = nullptr;
                 for (size_type i = 1; i < allocate_this_ * n; ++i)
                     for_deletion_.back()[i].__left_ = &(for_deletion_.back()[i - 1]);
 
@@ -117,8 +116,6 @@ namespace s21 {
 
             auto ret = reusable_->__left_;
             reusable_->__left_ = reusable_->__left_->__left_;
-            ret->__left_ = nullptr;
-
 
             return static_cast<pointer>(ret);
         }
@@ -185,4 +182,4 @@ namespace s21 {
     std::vector<typename MyTreeAllocator<T>::pointer> MyTreeAllocator<T>::for_deletion_;
 } //namespace s21
 
-#endif //S21_CONTAINERS_S21_TREEALLOCATOR_H_
+#endif //S21_CONTAINERS_TREEALLOCATOR_H_

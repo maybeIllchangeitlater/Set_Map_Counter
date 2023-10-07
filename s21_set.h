@@ -9,6 +9,7 @@
 #include <iostream> //delete later
 #include <type_traits>
 #include "TreeAllocator.h"
+#include "decorator.h"
 
 //template<typename T>
 //class SetIterator;
@@ -18,6 +19,7 @@ struct MyComparator {
     bool operator()(const T &lhs, const T &rhs) const {
         return lhs < rhs;
     }
+
 }; //no real reason, just for fun.
 
 
@@ -27,11 +29,11 @@ class set {
 public:
 
     struct Node {
-        T key;
-        size_t height = 1;
-        Node *parent = nullptr;
-        Node *__left_ = nullptr;
-        Node *right = nullptr;
+        T __key_;
+        size_t __height_;
+        Node *__parent_;
+        Node *__left_;
+        Node *__right_;
     };
     using allocator_type = Allocator;
     using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
@@ -60,7 +62,7 @@ public:
 
 
         reference operator*() const {
-            return n_->key;
+            return n_->__key_;
         }
 
         /**
@@ -68,13 +70,13 @@ public:
          *  if it doesn't go up until you either encounter right(unvisited) node or nullptr
          */
         iterator operator++() {
-            if (n_->right) {
-                n_ = FindLeftmost(n_->right);
+            if (n_->__right_) {
+                n_ = FindLeftmost(n_->__right_);
             } else {
-                while (n_->parent && n_->parent->right == n_) {
-                    n_ = n_->parent;
+                while (n_->__parent_ && n_->__parent_->__right_ == n_) {
+                    n_ = n_->__parent_;
                 }
-                n_ = n_->parent;
+                n_ = n_->__parent_;
             }
             return *this;
         }
@@ -87,10 +89,10 @@ public:
             if (n_->__left_) {
                 n_ = FindRightmost(n_->__left_);
             } else {
-                while (n_->parent && n_->parent->__left_ == n_) {
-                    n_ = n_->parent;
+                while (n_->__parent_ && n_->__parent_->__left_ == n_) {
+                    n_ = n_->__parent_;
                 }
-                n_ = n_->parent;
+                n_ = n_->__parent_;
             }
         }
 
@@ -123,10 +125,10 @@ public:
     using const_iterator = SetIterator;
 
 
-    set() : size_(0), root_(nullptr), comparator_(), alloc_(), node_alloc_() {}
+    set() : size_(0), root_(nullptr), comparator_(*this, Compare()), alloc_(), node_alloc_(alloc_) {}
 
     /**
-     * @brief Wont compile if alloc type and template alloc are different;
+     * @brief Wont compile if alloc type and template alloc are different;\n
      * As per allocator requirements all allocators related by rebind
      * maintain each other's resources, such as memory pools therefore rebound alloc
      * can be constructed through non-rebound alloc
@@ -134,33 +136,62 @@ public:
      * @param alloc instance of template type or default constructed template alloc by default
      */
     explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0), root_(nullptr),
-    comparator_(comp), alloc_(alloc), node_alloc_(alloc){}
+    comparator_(*this, comp), alloc_(alloc), node_alloc_(alloc){}
 
     /**
-     * @brief Wont compile if alloc type and template alloc are different;
+     * @brief Wont compile if alloc type and template alloc are different;\n
      * As per allocator requirements all allocators related by rebind
      * maintain each other's resources, such as memory pools therefore rebound alloc
      * can be constructed through non-rebound alloc
      * @param alloc instance of template type
      */
-    explicit set(const Allocator& alloc ) : size_(0), root_(nullptr), comparator_(), alloc_(alloc), node_alloc_(alloc){}
+    explicit set(const Allocator& alloc ) :
+    size_(0), root_(nullptr), comparator_(*this, Compare()), alloc_(alloc), node_alloc_(alloc){}
 
-    set(std::initializer_list<value_type> const &items) : set() {
-        for (const auto &v: items)
+    set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
+    set(comp, alloc){
+        for (auto &v: init)
             Append(v);
     }
 
-    set(const set &s) : set() {
+    set( std::initializer_list<value_type> init, const Allocator& alloc ) : set(init, Compare(), alloc) {}
+
+
+    /**
+     * @brief Copies everything from set s.\n If comparator is non-copy constructible will choose
+     * other copy constructor which will create default-constructed comparator
+     */
+    template <typename U = Compare>
+    set(const set &s, typename std::enable_if<std::is_copy_constructible<U>::value>::type* = nullptr) :
+    size_(0), root_(nullptr), comparator_(*this, s.key_comp()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
         for (const auto &v: s)
             Append(v);
     }
+//    /**
+//     * @brief Copies everything from set s.\n If comparator is constructible will choose
+//     * other copy constructor which will preform a comparator copy
+//     */
+//    template <typename U = Compare>
+//    set(const set &s, typename std::enable_if<!std::is_copy_constructible<U>::value>::type* = nullptr) :
+//            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
+//        for (const auto &v: s)
+//            Append(v);
+//    }
 
-    set(set &&s)  noexcept : set() {
-        size_ = std::exchange(s.size_, size_);
-        root_ = std::exchange(s.root_, root_);
-        alloc_ = std::exchange(s.alloc_, alloc_);
-        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
-    }
+    /**
+     * @brief Moves everything from set s.\n If comparator is non-move constructible will choose
+     * other copy constructor which will create default-constructed comparator
+     */
+//    template <typename U = Compare>
+//    set(set &&s)  noexcept : set() {
+//        if(std::is_nothrow_move_constructible_v<U>>){
+//            std::cout << "BOO";
+//        }
+//        size_ = std::exchange(s.size_, size_);
+//        root_ = std::exchange(s.root_, root_);
+//        alloc_ = std::exchange(s.alloc_, alloc_);
+//        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
+//    }
 
     /**
      * @brief rewrite
@@ -231,8 +262,8 @@ public:
             }
         }
     }
-    void insert( std::initializer_list<value_type> ilist ){
-        for(auto & v: ilist){
+    void insert( std::initializer_list<value_type>&& ilist ){
+        for(auto && v: ilist){
             Append(v);
         }
     }
@@ -297,11 +328,19 @@ public:
         return iterator(nullptr);
     }
 
-    const_iterator cbegin(){
+    iterator begin() const {
         return const_iterator(FindLeftmost(root_));
     }
 
-    const_iterator cend(){
+    iterator end() const{
+        return const_iterator(nullptr);
+    }
+
+    const_iterator cbegin() const{
+        return const_iterator(FindLeftmost(root_));
+    }
+
+    const_iterator cend() const{
         return const_iterator(nullptr);
     }
 
@@ -314,30 +353,57 @@ public:
     }
 
     void clear() {
-        ClearNodes(root_);
+        if (root_)
+            ClearNodes(root_);
         size_ = 0;
     }
 
     constexpr typename std::enable_if<std::is_copy_constructible<key_compare>::value, key_compare>::type key_comp() const {
-        return comparator_;
+        return comparator_.cmp_;
+//        return comparator_;
     }
 
     constexpr typename std::enable_if<std::is_copy_constructible<value_compare>::value, key_compare>::type value_comp() const {
-        return comparator_;
+        return comparator_.cmp_;
+//        return comparator_;
     }
     constexpr allocator_type get_allocator()const noexcept{
         return alloc_;
     }
 
 protected:
+    /**
+     * @brief noexcept is not required for comparator.
+     * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
+     * rebalancing
+     */
+    template <typename Set, typename Cmp = Compare>
+    struct SafeCompare{
+        explicit SafeCompare(Set & s, Cmp & cmp) : s_(s), cmp_(cmp){}
+        explicit SafeCompare(Set & s, const Cmp & cmp) : s_(s), cmp_(cmp) {}
+        explicit SafeCompare(Set & s, Cmp&& cmp) : s_(s), cmp_(cmp){}
+
+        bool operator()(const T &lhs, const T &rhs) const{
+            try{
+                std::cout << "SAFE AND SOUND" << std::endl;
+                return cmp_(lhs, rhs);
+            }catch(...){
+                s_.clear();
+                return false;
+            }
+        }
+        Set& s_;
+        const Cmp& cmp_;
+    };
+
     Node* AllocateAndConstruct(value_type &value){
         try {
-            Node *target = static_cast<Node*>(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1));
+            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
             target->__left_ = nullptr;
-            target->right = nullptr;
-            target->parent = nullptr;
-            target->height = 1;
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->key), value);
+            target->__right_ = nullptr;
+            target->__parent_ = nullptr;
+            target->__height_ = 1;
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), value);
             return target;
         } catch (...){
             clear();
@@ -346,24 +412,28 @@ protected:
     }
 
     void DestructAndDeallocate(Node* target){
-        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->key));
+        std::allocator_traits<allocator_type>::destroy(alloc_, &(target->__key_));
         std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, target, 1);
+//        target->__left_ = nullptr;
+//        target->__right_ = nullptr;
+//        target->__parent_ = nullptr;
+//        target->__height_ = 1;
     }
     /**
      * @brief recursively clears everything to the right and to the left from node before clearing the node
      */
     void ClearNodes(Node* root){
         if(root->__left_) {
-            if(!root->__left_->__left_&& !root->__left_->right){
+            if(!root->__left_->__left_&& !root->__left_->__right_){
                DestructAndDeallocate(root->__left_);
             }
             else ClearNodes(root->__left_);
         }
-        if(root->right) {
-            if(!root->right->__left_ && !root->right->right){
-                DestructAndDeallocate(root->right);
+        if(root->__right_) {
+            if(!root->__right_->__left_ && !root->__right_->__right_){
+                DestructAndDeallocate(root->__right_);
             }
-            else ClearNodes(root->right);
+            else ClearNodes(root->__right_);
         }
 
         DestructAndDeallocate(root);
@@ -374,10 +444,10 @@ protected:
     Node *Search(reference &value) const noexcept {
         Node *tmp = root_;
         while (tmp) {
-            if (comparator_(value, tmp->key)) {
+            if (comparator_(value, tmp->__key_)) {
                 tmp = tmp->__left_;
-            } else if (comparator_(tmp->key, value)) {
-                tmp = tmp->right;
+            } else if (comparator_(tmp->__key_, value)) {
+                tmp = tmp->__right_;
             } else {
                 return tmp;
             }
@@ -402,12 +472,12 @@ protected:
         if (!root) {
             return target;
         }
-        if (comparator_(target->key, root->key)) {
+        if (comparator_(target->__key_, root->__key_)) {
             root->__left_ = Insert(root->__left_, target);
-            root->__left_->parent = root;
-        } else if (comparator_(root->key, target->key)) {
-            root->right = Insert(root->right, target);
-            root->right->parent = root;
+            root->__left_->__parent_ = root;
+        } else if (comparator_(root->__key_, target->__key_)) {
+            root->__right_ = Insert(root->__right_, target);
+            root->__right_->__parent_ = root;
         } else {
             return root;
         }
@@ -420,35 +490,35 @@ protected:
     * if it's a node with 2 children, node is 'replaced' by leftmost node from right child
     * (or you can change it to rightmost from left child, doesn't matter)
     */
-    Node *Delete(Node *root, reference &value) {
+    Node *Delete(Node *root, key_type &value) {
         if (!root) {
             return nullptr;
         }
-        if (comparator_(value, root->key)) {
+        if (comparator_(value, root->__key_)) {
             root->__left_ = Delete(root->__left_, value);
             if (root->__left_) {
-                root->__left_->parent = root;
+                root->__left_->__parent_ = root;
             }
-        } else if (comparator_(root->key, value)) {
-            root->right = Delete(root->right, value);
-            if (root->right) {
-                root->right->parent = root;
+        } else if (comparator_(root->__key_, value)) {
+            root->__right_ = Delete(root->__right_, value);
+            if (root->__right_) {
+                root->__right_->__parent_ = root;
             }
         } else {
-            if (!root->__left_ || !root->right) {
-                Node *needs_father_figure = root->__left_ ? root->__left_ : root->right;
+            if (!root->__left_ || !root->__right_) {
+                Node *needs_father_figure = root->__left_ ? root->__left_ : root->__right_;
                 if (needs_father_figure) {
-                    needs_father_figure->parent = nullptr;
+                    needs_father_figure->__parent_ = nullptr;
                 }
                 DestructAndDeallocate(root);
                 return needs_father_figure;
             }
-            Node *new_root = FindLeftmost(root->right);
-            new_root->parent = nullptr;
-            new_root->right = RebalanceFromLeft(root->right);
-            if (new_root->right) new_root->right->parent = new_root;
+            Node *new_root = FindLeftmost(root->__right_);
+            new_root->__parent_ = nullptr;
+            new_root->__right_ = RebalanceFromLeft(root->__right_);
+            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
             new_root->__left_ = root->__left_;
-            if (new_root->right) new_root->right->parent = new_root;
+            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
             DestructAndDeallocate(root);
             return Balance(new_root);
         }
@@ -464,8 +534,8 @@ protected:
     Node *Balance(Node *root) noexcept {
         FixHeight(root);
         if (BalanceFactor(root) > 1) {
-            if (BalanceFactor(root->right) < 0) {
-                root->right = RotateRight(root->right);
+            if (BalanceFactor(root->__right_) < 0) {
+                root->__right_ = RotateRight(root->__right_);
             }
             return RotateLeft(root);
         }
@@ -484,12 +554,12 @@ protected:
     *
     */
     Node *RotateLeft(Node *root) noexcept {
-        Node *tmp = root->right;
-        root->right = tmp->__left_;
-        tmp->parent = root->parent;
-        if (tmp->__left_) tmp->__left_->parent = root;
+        Node *tmp = root->__right_;
+        root->__right_ = tmp->__left_;
+        tmp->__parent_ = root->__parent_;
+        if (tmp->__left_) tmp->__left_->__parent_ = root;
         tmp->__left_ = root;
-        root->parent = tmp;
+        root->__parent_ = tmp;
         FixHeight(root);
         FixHeight(tmp);
         return tmp;
@@ -502,11 +572,11 @@ protected:
     */
     Node *RotateRight(Node *root) noexcept {
         Node *tmp = root->__left_;
-        root->__left_ = tmp->right;
-        tmp->parent = root->parent;
-        if (tmp->right) tmp->right->parent = root;
-        tmp->right = root;
-        root->parent = tmp;
+        root->__left_ = tmp->__right_;
+        tmp->__parent_ = root->__parent_;
+        if (tmp->__right_) tmp->__right_->__parent_ = root;
+        tmp->__right_ = root;
+        root->__parent_ = tmp;
         FixHeight(root);
         FixHeight(tmp);
         return tmp;
@@ -515,16 +585,16 @@ protected:
 
     void FixHeight(Node *root) noexcept {
         size_type left_h = Height(root->__left_);
-        size_type right_h = Height(root->right);
-        root->height = std::max(left_h, right_h) + 1;
+        size_type right_h = Height(root->__right_);
+        root->__height_ = std::max(left_h, right_h) + 1;
     }
 
     int BalanceFactor(Node *root) const noexcept {
-        return Height(root->right) - Height(root->__left_);
+        return Height(root->__right_) - Height(root->__left_);
     }
 
     size_type Height(Node *root) const noexcept {
-        return root ? root->height : 0;
+        return root ? root->__height_ : 0;
     }
 
     static Node *FindLeftmost(Node *root) {
@@ -532,12 +602,12 @@ protected:
     }
 
     static Node *FindRightmost(Node *root) {
-        return root->right ? FindRightmost(root->right) : root;
+        return root->__right_ ? FindRightmost(root->__right_) : root;
     }
 
     Node *RebalanceFromLeft(Node *root) {
         if (!root->__left_)
-            return root->right;
+            return root->__right_;
         root->__left_ = RebalanceFromLeft(root->__left_);
         return Balance(root);
     }
@@ -549,9 +619,10 @@ protected:
     /**
      * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
      */
-    Compare comparator_;
+//    SafeCompare<set<T, Compare, Allocator>> comparator_;
+    SafeCompare<set<T, Compare, Allocator>> comparator_;
     allocator_type alloc_;
-    allocator_type_node node_alloc_;
+    allocator_type_node node_alloc_; //add fakeroot, add leftnode, decorator
 
 
 //    int size_;
@@ -559,3 +630,6 @@ protected:
 
 };
 #endif //S21_CONTAINERS_S21_SET_H_
+
+
+///// Tests with throws, especially comp. Move and copy constructors. Add fakeroot and leftmost node for O(1) begin and end
