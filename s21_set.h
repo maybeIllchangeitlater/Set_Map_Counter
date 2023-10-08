@@ -35,6 +35,7 @@ public:
         Node *__left_;
         Node *__right_;
     };
+
     using allocator_type = Allocator;
     using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
     using key_type = const T;
@@ -44,7 +45,6 @@ public:
     using value_compare = key_compare;
     using const_reference = const T &;
     using size_type = size_t;
-
     class SetIterator {
     public:
         using iterator = SetIterator;
@@ -125,102 +125,109 @@ public:
     using const_iterator = SetIterator;
 
 
-    set() : size_(0), root_(nullptr), comparator_(*this, Compare()), alloc_(), node_alloc_(alloc_) {}
+    set() : size_(0), root_(nullptr), comparator_(Compare()), alloc_(), node_alloc_(alloc_) {}
 
     /**
-     * @brief Wont compile if alloc type and template alloc are different;\n
+     * @brief Wont compile if alloc type and template alloc are different or if comparator is not copy
+     * constructable;\n
      * As per allocator requirements all allocators related by rebind
      * maintain each other's resources, such as memory pools therefore rebound alloc
      * can be constructed through non-rebound alloc
      * @param comp instance of template type
      * @param alloc instance of template type or default constructed template alloc by default
      */
-    explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0), root_(nullptr),
-    comparator_(*this, comp), alloc_(alloc), node_alloc_(alloc){}
+    explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0),
+    root_(nullptr), comparator_(comp), alloc_(alloc), node_alloc_(alloc){}
 
     /**
-     * @brief Wont compile if alloc type and template alloc are different;\n
+     * @brief Wont compile if alloc type and template alloc are different
      * As per allocator requirements all allocators related by rebind
      * maintain each other's resources, such as memory pools therefore rebound alloc
      * can be constructed through non-rebound alloc
      * @param alloc instance of template type
      */
     explicit set(const Allocator& alloc ) :
-    size_(0), root_(nullptr), comparator_(*this, Compare()), alloc_(alloc), node_alloc_(alloc){}
+    size_(0), root_(nullptr), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc){}
 
     set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
     set(comp, alloc){
         for (auto &v: init)
-            Append(v);
+            EmplaceAppend(std::move(v));
     }
 
-    set( std::initializer_list<value_type> init, const Allocator& alloc ) : set(init, Compare(), alloc) {}
+    set(std::initializer_list<value_type> init, const Allocator& alloc) : set(init, Compare(), alloc) {}
 
 
     /**
      * @brief Copies everything from set s.\n If comparator is non-copy constructible will choose
-     * other copy constructor which will create default-constructed comparator
+     * create default constructed copy
      */
-    template <typename U = Compare>
-    set(const set &s, typename std::enable_if<std::is_copy_constructible<U>::value>::type* = nullptr) :
-    size_(0), root_(nullptr), comparator_(*this, s.key_comp()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
+    set(const set &s) :
+    size_(0), root_(nullptr), comparator_(std::is_copy_constructible_v<Compare> ? s.key_comp() : Compare()),
+    alloc_(s.get_allocator()), node_alloc_(alloc_) {
         for (const auto &v: s)
-            Append(v);
+            Add(v);
     }
-//    /**
-//     * @brief Copies everything from set s.\n If comparator is constructible will choose
-//     * other copy constructor which will preform a comparator copy
-//     */
-//    template <typename U = Compare>
-//    set(const set &s, typename std::enable_if<!std::is_copy_constructible<U>::value>::type* = nullptr) :
-//            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
-//        for (const auto &v: s)
-//            Append(v);
-//    }
 
-    /**
-     * @brief Moves everything from set s.\n If comparator is non-move constructible will choose
-     * other copy constructor which will create default-constructed comparator
-     */
-//    template <typename U = Compare>
-//    set(set &&s)  noexcept : set() {
-//        if(std::is_nothrow_move_constructible_v<U>>){
-//            std::cout << "BOO";
-//        }
-//        size_ = std::exchange(s.size_, size_);
-//        root_ = std::exchange(s.root_, root_);
-//        alloc_ = std::exchange(s.alloc_, alloc_);
-//        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
-//    }
 
-    /**
-     * @brief rewrite
-     */
+
+    set(set &&s)  noexcept  : size_(s.size_), root_(s.root_),
+    comparator_(kComparator_moves ? std::move(s.comparator_) : s.comparator_),
+    alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.node_alloc_)){
+        s.size_ = 0;
+        s.root_ = nullptr;
+    }
+
     set &operator=(const set &s) {
-        if(this == s)
+        if(this == &s)
             return *this;
         clear();
+        comparator_ = std::is_copy_constructible_v<Compare> ? s.key_comp() : Compare();
+        alloc_ = s.alloc_;
+        node_alloc_ = s.node_alloc_;
         for (const auto &v: s)
-            Append(v);
-        return *this;
-    }
-    /**
-     * @brief rewrite
-     */
-    set &operator=(set &&s)  noexcept {
-        if(this == s)
-            return *this;
-        clear();
-        size_ = std::exchange(s.size_, size_);
-        root_ = std::exchange(s.root_, root_);
-        alloc_ = std::exchange(s.alloc_, alloc_);
-        node_alloc_ = std::exchange(s.node_alloc_, node_alloc_);
+            Add(v);
         return *this;
     }
 
-    virtual ~set(){
+    set &operator=(set &&s)  noexcept {
+        if(this == &s)
+            return *this;
+        clear();
+        size_ = s.size_;
+        root_ = s.root_;
+        comparator_ = kComparator_moves ? std::move(s.comparator_) : s.comparator_;
+        alloc_ = std::move(s.alloc_);
+        node_alloc_ = std::move(s.node_alloc_);
+        s.size_ = 0;
+        s.root_ = nullptr;
+        return *this;
+    }
+
+    ~set(){
         clear();
     };
+    /**
+     * @brief  Inserts a new element into the container constructed in-place with the given args if there is no element with the key in the container.\n
+     * Careful use of emplace allows the new element to be constructed while avoiding unnecessary copy or move operations. The constructor \n
+     *   of the new element is called with exactly the same arguments as supplied to emplace, forwarded via std::forward<Args>(args).... \n
+     *  The element may be constructed even if there already is an element with the key in the container, in which case the newly constructed \n
+     *   element will be destroyed immediately.\n
+     *   tldr: worse than insert if element with key exists in tree, better if it doesn't
+     */
+    template<typename ... Args >
+    std::pair<iterator, bool> emplace(Args&&... args){
+        Node * target = AllocateAndConstruct(std::forward<Args>(args)...);
+        auto it = find(target->__key_);
+        if (it != end()) {
+            DestructAndDeallocate(target);
+            return std::make_pair(it, false);
+        } else{
+            root_ = Insert(root_, target);
+            ++size_;
+            return std::make_pair(find(target->__key_), true);
+        }
+    }
     /**
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
@@ -245,7 +252,7 @@ public:
         if (it != end()) {
             return std::make_pair(it, false);
         } else {
-            Node * target = AllocateAndConstruct(value);
+            Node * target = AllocateAndConstruct(std::move(value));
             root_ = Insert(root_, target);
             ++size_;
             return std::make_pair(find(value), true);
@@ -262,9 +269,9 @@ public:
             }
         }
     }
-    void insert( std::initializer_list<value_type>&& ilist ){
-        for(auto && v: ilist){
-            Append(v);
+    void insert(std::initializer_list<value_type> ilist ){
+        for(auto & v: ilist){
+            EmplaceAppend(std::move(v));
         }
     }
     /**
@@ -281,6 +288,12 @@ public:
      */
     void erase(iterator pos) {
         erase(*pos);
+    }
+
+    void erase(const_iterator first, const_iterator last){
+        while(first != last){
+            first = erase(first);
+        }
     }
     /**
      * @brief returns iterator to position of node with input value or iterator to end
@@ -299,26 +312,38 @@ public:
     void swap(set &other) {
         std::swap(root_, other.root_);
         std::swap(size_, other.size_);
+        std::swap(comparator_, other.comparator_);
+        std::swap(alloc_, other.alloc_);
+        std::swap(node_alloc_, other.node_alloc_);
     }
 
     /**
      * @brief splices Nodes from other set to current set
      */
-//    void merge(set& other){
-//        for(auto it = other.begin(); it != other.end(); ++it){
-//            Node* tmp = search(*it);
-//            if(tmp == end()){
-//                tmp = other.search(*it);
-//            }
-//
-//        }
-//        for(auto it = ++other.begin(); it != end(); ++it) {
-//            Node<T>* n = other.search(*(--it));
-//            if(n){
-//                root_ = Insert(root_, n); // recursive pass current iterator and insert previous into root?
-//            }
-//        }
-//    }
+    void merge(set& other){
+        auto one_step_behind = other.end();
+        for(auto it = other.begin(); it != other.end(); ++it){
+            if(one_step_behind != other.end() && !contains(*one_step_behind)){
+                auto root_and_extract = other.Extract(other.root_, *one_step_behind);
+                other.root_ = root_and_extract.first;
+                root_and_extract.second->__left_ = nullptr;
+                root_and_extract.second->__right_ = nullptr;
+                root_and_extract.second->__parent_ = nullptr;
+                root_and_extract.second->__height_ = 1;
+                root_ = Insert(root_, root_and_extract.second);
+            }
+            one_step_behind = it;
+        }
+        if(one_step_behind != other.end() && !contains(*one_step_behind)){
+            auto root_and_extract = other.Extract(other.root_, *one_step_behind);
+            other.root_ = root_and_extract.first;
+            root_and_extract.second->__left_ = nullptr;
+            root_and_extract.second->__right_ = nullptr;
+            root_and_extract.second->__parent_ = nullptr;
+            root_and_extract.second->__height_ = 1;
+            root_ = Insert(root_, root_and_extract.second);
+        }
+    }
 
     iterator begin() {
         return iterator(FindLeftmost(root_));
@@ -348,62 +373,61 @@ public:
         return !size_;
     }
 
-    const size_type &size() const noexcept{
+    size_type size() const noexcept{
         return size_;
     }
 
     void clear() {
-        if (root_)
+        if (root_){
             ClearNodes(root_);
+            root_ = nullptr;
+        }
         size_ = 0;
+
     }
 
     constexpr typename std::enable_if<std::is_copy_constructible<key_compare>::value, key_compare>::type key_comp() const {
-        return comparator_.cmp_;
-//        return comparator_;
+        return comparator_;
     }
 
     constexpr typename std::enable_if<std::is_copy_constructible<value_compare>::value, key_compare>::type value_comp() const {
-        return comparator_.cmp_;
-//        return comparator_;
+        return comparator_;
     }
     constexpr allocator_type get_allocator()const noexcept{
         return alloc_;
+    }
+
+    bool operator==(const set& rhs) const{
+        return this == &rhs;
+    }
+    bool operator!=(const set& rhs) const{
+        return this != &rhs;
     }
 
 protected:
     /**
      * @brief noexcept is not required for comparator.
      * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
-     * rebalancing
+     * rebalancing.
      */
-    template <typename Set, typename Cmp = Compare>
-    struct SafeCompare{
-        explicit SafeCompare(Set & s, Cmp & cmp) : s_(s), cmp_(cmp){}
-        explicit SafeCompare(Set & s, const Cmp & cmp) : s_(s), cmp_(cmp) {}
-        explicit SafeCompare(Set & s, Cmp&& cmp) : s_(s), cmp_(cmp){}
+    bool SafeCompare(const value_type lhs, const value_type rhs) const{
+         try{
+             return comparator_(lhs, rhs);
+         }catch(...){
+             const_cast<set<T, Compare, Allocator>*>(this)->clear();
+             throw;
+         }
+     } //const cast is necessitated by const objects using comparator for find, etc. Alternative is delete this
 
-        bool operator()(const T &lhs, const T &rhs) const{
-            try{
-                std::cout << "SAFE AND SOUND" << std::endl;
-                return cmp_(lhs, rhs);
-            }catch(...){
-                s_.clear();
-                return false;
-            }
-        }
-        Set& s_;
-        const Cmp& cmp_;
-    };
-
-    Node* AllocateAndConstruct(value_type &value){
+    template <typename... Args>
+    Node* AllocateAndConstruct(Args&&... args){
         try {
             Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
             target->__left_ = nullptr;
             target->__right_ = nullptr;
             target->__parent_ = nullptr;
             target->__height_ = 1;
-            std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), value);
+            std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), std::forward<Args>(args)...);
             return target;
         } catch (...){
             clear();
@@ -414,10 +438,6 @@ protected:
     void DestructAndDeallocate(Node* target){
         std::allocator_traits<allocator_type>::destroy(alloc_, &(target->__key_));
         std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, target, 1);
-//        target->__left_ = nullptr;
-//        target->__right_ = nullptr;
-//        target->__parent_ = nullptr;
-//        target->__height_ = 1;
     }
     /**
      * @brief recursively clears everything to the right and to the left from node before clearing the node
@@ -444,9 +464,9 @@ protected:
     Node *Search(reference &value) const noexcept {
         Node *tmp = root_;
         while (tmp) {
-            if (comparator_(value, tmp->__key_)) {
+            if (SafeCompare(value, tmp->__key_)) {
                 tmp = tmp->__left_;
-            } else if (comparator_(tmp->__key_, value)) {
+            } else if (SafeCompare(tmp->__key_, value)) {
                 tmp = tmp->__right_;
             } else {
                 return tmp;
@@ -459,9 +479,39 @@ protected:
      */
     void Append(value_type& value){
         if(!contains(value)) {
-            Node* target = AllocateAndConstruct(value);
+            Add(value);
+        }
+    }
+    /**
+     * @brief check for node, create node, insert node.
+     */
+    void Append(value_type&& value){
+        if(!contains(value)) {
+            Node* target = AllocateAndConstruct(std::move(value));
             root_ = Insert(root_, target);
             ++size_;
+        }
+    }
+    /**
+     * @brief insert for copy constructor/operator. Doesn't check if node already exists
+     *
+     */
+    void Add(value_type& value){
+        Node* target = AllocateAndConstruct(value);
+        root_ = Insert(root_, target);
+        ++size_;
+    }
+    /**
+     * @brief void return emplace version for initlist insert and constructor
+     */
+    template <typename... Args>
+    void EmplaceAppend(Args&&... args){
+        Node * target = AllocateAndConstruct(std::forward<Args>(args)...);
+        if(!contains(target->__key_)){
+            root_ = Insert(root_, target);
+            ++size_;
+        }else{
+            DestructAndDeallocate(target);
         }
     }
     /**
@@ -469,13 +519,13 @@ protected:
     * If node already exist will do nothing but attempting few rebalances; Prefereably find first;
     */
     Node *Insert(Node *root, Node *target) {
-        if (!root) {
+        if(!root) {
             return target;
         }
-        if (comparator_(target->__key_, root->__key_)) {
+        if (SafeCompare(target->__key_, root->__key_)) {
             root->__left_ = Insert(root->__left_, target);
             root->__left_->__parent_ = root;
-        } else if (comparator_(root->__key_, target->__key_)) {
+        } else if (SafeCompare(root->__key_, target->__key_)) {
             root->__right_ = Insert(root->__right_, target);
             root->__right_->__parent_ = root;
         } else {
@@ -491,39 +541,71 @@ protected:
     * (or you can change it to rightmost from left child, doesn't matter)
     */
     Node *Delete(Node *root, key_type &value) {
-        if (!root) {
-            return nullptr;
-        }
-        if (comparator_(value, root->__key_)) {
+        if (SafeCompare(value, root->__key_)) {
             root->__left_ = Delete(root->__left_, value);
             if (root->__left_) {
                 root->__left_->__parent_ = root;
             }
-        } else if (comparator_(root->__key_, value)) {
+        } else if (SafeCompare(root->__key_, value)) {
             root->__right_ = Delete(root->__right_, value);
             if (root->__right_) {
                 root->__right_->__parent_ = root;
             }
         } else {
-            if (!root->__left_ || !root->__right_) {
-                Node *needs_father_figure = root->__left_ ? root->__left_ : root->__right_;
-                if (needs_father_figure) {
-                    needs_father_figure->__parent_ = nullptr;
-                }
-                DestructAndDeallocate(root);
-                return needs_father_figure;
-            }
-            Node *new_root = FindLeftmost(root->__right_);
-            new_root->__parent_ = nullptr;
-            new_root->__right_ = RebalanceFromLeft(root->__right_);
-            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
-            new_root->__left_ = root->__left_;
-            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
+            Node * left = root->__left_;
+            Node * right = root->__right_;
             DestructAndDeallocate(root);
+            if(!right) {
+                if(left) left->__parent_ = nullptr;
+                return left;
+            }
+            Node *new_root = FindLeftmost(right);
+            new_root->__parent_ = nullptr;
+            new_root->__right_ = RebalanceFromLeft(right);
+            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
+            new_root->__left_ = left;
+            if (new_root->__left_) new_root->__left_->__parent_ = new_root;
             return Balance(new_root);
         }
 
         return Balance(root);
+    }
+    /**
+     * @brief extracts Node from the tree, unlinking it but not deleting it
+     */
+    std::pair<Node*, Node*> Extract(Node* root, key_type& value, Node* res = nullptr){
+        if (SafeCompare(value, root->__key_)) {
+            auto extract = Extract(root->__left_, value, res);
+            root->__left_ = extract.first;
+            res = extract.second;
+            if (root->__left_) {
+                root->__left_->__parent_ = root;
+            }
+        } else if (SafeCompare(root->__key_, value)) {
+            auto extract = Extract(root->__right_, value, res);
+            root->__right_ = extract.first;
+            res = extract.second;
+            if (root->__right_) {
+                root->__right_->__parent_ = root;
+            }
+        } else {
+            --size_;
+            Node * left = root->__left_;
+            Node * right = root->__right_;
+            if(!right) {
+                if(left) left->__parent_ = nullptr;
+                return std::make_pair(left, root);
+            }
+            Node *new_root = FindLeftmost(right);
+            new_root->__parent_ = nullptr;
+            new_root->__right_ = RebalanceFromLeft(right);
+            if (new_root->__right_) new_root->__right_->__parent_ = new_root;
+            new_root->__left_ = left;
+            if (new_root->__left_) new_root->__left_->__parent_ = new_root;
+            return std::make_pair(Balance(new_root), root);
+        }
+
+        return std::make_pair(Balance(root), res);
     }
 
     /**
@@ -614,18 +696,17 @@ protected:
 
 
 //    private:
+    static constexpr const bool kComparator_moves = std::is_nothrow_move_constructible_v<Compare> || !std::is_copy_constructible_v<Compare>;
     size_type size_;
-    Node *root_;
+    Node * root_;
     /**
      * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
      */
-//    SafeCompare<set<T, Compare, Allocator>> comparator_;
-    SafeCompare<set<T, Compare, Allocator>> comparator_;
+    Compare comparator_;
     allocator_type alloc_;
-    allocator_type_node node_alloc_; //add fakeroot, add leftnode, decorator
+    allocator_type_node node_alloc_; //add fakeroot, add leftnode, extract (merge)
 
 
-//    int size_;
 };
 
 };

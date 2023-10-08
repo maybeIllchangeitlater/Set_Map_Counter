@@ -7,7 +7,8 @@
 #include <ctype.h>
 
 /**
- * @brief usable with LLVM (clang++) compiler RBTrees but not with GNU (GCC) compilers
+ * @brief usable with LLVM (clang++) compiler RBTrees but not with GNU (GCC) compilers\n
+ * should work for any linked list like structure given same pointer name (__left_)
  */
 namespace s21 {
     template<typename T>
@@ -27,41 +28,39 @@ namespace s21 {
 
         MyTreeAllocator() noexcept {
             ++ref_count_;
-            std::cout << "new allocator, refcount is: " << ref_count_ << std::endl;
+//            std::cout << "new allocator, refcount is: " << ref_count_ << std::endl;
         }
 
         MyTreeAllocator(const MyTreeAllocator&) noexcept : MyTreeAllocator() {}
 
         MyTreeAllocator& operator=(const MyTreeAllocator&) noexcept {
-            ++ref_count_;
             return *this;
         };
 
-        MyTreeAllocator(MyTreeAllocator&&) noexcept = default;
+        MyTreeAllocator(MyTreeAllocator&&) noexcept : MyTreeAllocator() {
+        };
 
-        MyTreeAllocator& operator=(MyTreeAllocator&&) noexcept = default;
+        MyTreeAllocator& operator=(MyTreeAllocator&&) noexcept {
+            return *this;
+        }
 
         /**
          * @brief logic for rebinded allocator construct. Idk for now
          * Technically I need refcount only for rebound(node) allocs
          */
         template<typename U>
-        MyTreeAllocator(const MyTreeAllocator<U>&) noexcept {
-            ++ref_count_;
+        MyTreeAllocator(const MyTreeAllocator<U>&) noexcept : MyTreeAllocator() {
         }
 
         template <typename U>
         MyTreeAllocator& operator=(const MyTreeAllocator<U>&) noexcept {
-            ++ref_count_;
             return *this;
         }
         template<typename U>
-        MyTreeAllocator(MyTreeAllocator<U>&&) noexcept{
-
+        MyTreeAllocator(MyTreeAllocator<U>&&) noexcept : MyTreeAllocator(){
         };
         template<typename U>
         MyTreeAllocator& operator=(MyTreeAllocator<U>&&) noexcept{
-
         };
 
         /**
@@ -69,11 +68,11 @@ namespace s21 {
          */
         ~MyTreeAllocator() {
             --ref_count_;
-            std::cout << "allocator dies, refcount is: " << ref_count_ << std::endl;
+//            std::cout << "allocator dies, refcount is: " << ref_count_ << std::endl;
             if (!ref_count_) {
                 int n = for_deletion_.size();
                 for (int i = 0; i < n; ++i) {
-                    std::cout << "ABOBA DOESNT LEAK" << std::endl;
+//                    std::cout << "ABOBA DOESNT LEAK" << std::endl;
                     ::operator delete[](for_deletion_[i]);
                 }
             }
@@ -99,9 +98,7 @@ namespace s21 {
             if(!n){
                 throw std::bad_alloc();
             }
-            std::cout << "ABOBA ALLOCATES" << std::endl;
             if (!reusable_ || !reusable_->__left_) {
-                std::cout << "ABOBA ALLOCATES NEW MEMORY" << std::endl;
                 for_deletion_.push_back(
                         static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
                 for_deletion_.back()[0].__left_ = nullptr;
@@ -126,7 +123,6 @@ namespace s21 {
          * implies call to destroy for T beforehands
          */
         void deallocate(const pointer ptr, const size_type n) {
-            std::cout << "ABOBA REUSES" << std::endl;
             if(n){}
             ptr->__left_ = reusable_->__left_;
             reusable_->__left_ = ptr;
@@ -138,7 +134,6 @@ namespace s21 {
          */
         template<typename U, typename... Args>
         void construct(U *ptr, Args &&... args) {
-            std::cout << "ABOBA CONSTRUCTS" << std::endl;;
             new(ptr) U(std::forward<Args>(args)...);
         }
 
@@ -147,7 +142,6 @@ namespace s21 {
          * Only gets called for T
          */
         void destroy(const pointer ptr) {
-            std::cout << "ABOBA YEETS T" << std::endl;
             ptr->~T();
         }
 
