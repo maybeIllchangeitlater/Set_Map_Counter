@@ -232,7 +232,7 @@ public:
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
      */
-    std::pair<iterator, bool> insert(const value_type& value) {
+    std::pair<iterator, bool> insert(value_type& value) {
         auto it = find(value);
         if (it != end()) {
             return std::make_pair(it, false);
@@ -398,10 +398,28 @@ public:
     }
 
     bool operator==(const set& rhs) const{
-        return this == &rhs;
+        if (size_ != rhs.size_)
+            return false;
+        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end()) &&
+        !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
     }
     bool operator!=(const set& rhs) const{
-        return this != &rhs;
+        if (size_ != rhs.size_)
+            return true;
+        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end()) || //perepisat
+               !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+    }
+    bool operator<(const set& rhs) const{
+        return std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end());
+    }
+    bool operator>(const set& rhs) const{
+        return std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+    }
+    bool operator>=(const set& rhs) const{
+        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end());
+    }
+    bool operator<=(const set& rhs) const{
+        return !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
     }
 
 protected:
@@ -695,7 +713,7 @@ protected:
     }
 
 
-//    private:
+private:
     static constexpr const bool kComparator_moves = std::is_nothrow_move_constructible_v<Compare> || !std::is_copy_constructible_v<Compare>;
     size_type size_;
     Node * root_;
@@ -704,7 +722,7 @@ protected:
      */
     Compare comparator_;
     allocator_type alloc_;
-    allocator_type_node node_alloc_; //add fakeroot, add leftnode, extract (merge)
+    allocator_type_node node_alloc_;
 
 
 };
