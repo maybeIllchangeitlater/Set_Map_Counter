@@ -18,8 +18,6 @@ namespace s21{
         bool operator()(const T &lhs, const T &rhs) const {
             return lhs < rhs;
         }
-
-    private:
         int x;
     };
 }

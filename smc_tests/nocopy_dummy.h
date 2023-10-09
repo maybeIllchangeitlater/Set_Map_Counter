@@ -4,25 +4,29 @@
 namespace s21{
     class NoCopyDummyT{
     public:
-        NoCopyDummyT();
+        NoCopyDummyT() = default;
         NoCopyDummyT(int y) : x(y){}
+        NoCopyDummyT(NoCopyDummyT&& other) noexcept {x = other.x;}
+        NoCopyDummyT& operator=(NoCopyDummyT&& other) noexcept{x = other.x; return *this;}
         NoCopyDummyT(NoCopyDummyT&) = delete;
         NoCopyDummyT& operator=(NoCopyDummyT&) = delete;
-    private:
+        const bool operator<(const NoCopyDummyT& rhs) const{
+            return x < rhs.x;
+        }
         int x;
     };
     template<typename T>
     class NoCopyDummyComp{
     public:
-        NoCopyDummyComp();
+        NoCopyDummyComp() = default;
         NoCopyDummyComp(int y) : x(y){}
         NoCopyDummyComp(NoCopyDummyComp&) = delete;
         NoCopyDummyComp& operator=(NoCopyDummyComp&) = delete;
+        NoCopyDummyComp(NoCopyDummyComp&& other)noexcept{x = other.x;}
+        NoCopyDummyComp& operator=(NoCopyDummyComp&& other)noexcept{x = other.x; return *this;}
         bool operator()(const T &lhs, const T &rhs) const {
             return lhs < rhs;
         }
-
-    private:
         int x;
     };
 }

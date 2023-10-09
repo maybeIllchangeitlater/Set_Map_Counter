@@ -45,6 +45,11 @@ public:
     using value_compare = key_compare;
     using const_reference = const T &;
     using size_type = size_t;
+    using comparator_moves = std::conditional_t<
+            std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
+            std::true_type,
+            std::false_type
+    >;
     class SetIterator {
     public:
         using iterator = SetIterator;
@@ -52,6 +57,7 @@ public:
         using difference_type = std::ptrdiff_t;
         using reference = const T &;
         using pointer = const T *;
+        using value_type = const T;
 
 
         SetIterator() = default;
@@ -63,6 +69,10 @@ public:
 
         reference operator*() const {
             return n_->__key_;
+        }
+
+        pointer operator->() const{
+            return &(n_->__key_);
         }
 
         /**
@@ -159,30 +169,49 @@ public:
 
 
     /**
-     * @brief Copies everything from set s.\n If comparator is non-copy constructible will choose
+     * @brief Copies from set s.\n If comparator is non-copy constructible will
      * create default constructed copy
      */
-    set(const set &s) :
-    size_(0), root_(nullptr), comparator_(std::is_copy_constructible_v<Compare> ? s.key_comp() : Compare()),
-    alloc_(s.get_allocator()), node_alloc_(alloc_) {
+
+    set(const set &s) : set(s, std::is_copy_constructible<Compare>()) {}
+
+
+    set(const set &s, std::true_type) :
+    size_(0), root_(nullptr), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_) {
         for (const auto &v: s)
             Add(v);
     }
 
-
-
-    set(set &&s)  noexcept  : size_(s.size_), root_(s.root_),
-    comparator_(kComparator_moves ? std::move(s.comparator_) : s.comparator_),
-    alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.node_alloc_)){
-        s.size_ = 0;
-        s.root_ = nullptr;
+    set(const set& s, std::false_type) :
+            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
+        for (const auto &v: s)
+            Add(v);
     }
 
+    /**
+     * @brief Moves from set s.\n If comparator is nothrow movable or non-copy constructible will
+     * copy
+     */
+    set(set&& s) noexcept : set(std::move(s), kComparator_moves){}
+
+    set(set&& s, std::true_type) noexcept : size_(s.size_), root_(s.root_), comparator_(std::move(s.comparator_)), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)){
+        s.root_ = nullptr;
+        s.size_ = 0;
+    }
+
+    set(set&& s, std::false_type) : size_(s.size_), root_(s.root_), comparator_(s.comparator_), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)){
+        s.root_ = nullptr;
+        s.size_ = 0;
+    }
+
+    /**
+     * @brief if comp or T has no copy constructor wont compile
+     */
     set &operator=(const set &s) {
         if(this == &s)
             return *this;
         clear();
-        comparator_ = std::is_copy_constructible_v<Compare> ? s.key_comp() : Compare();
+        comparator_ = s.comparator_;
         alloc_ = s.alloc_;
         node_alloc_ = s.node_alloc_;
         for (const auto &v: s)
@@ -196,7 +225,11 @@ public:
         clear();
         size_ = s.size_;
         root_ = s.root_;
-        comparator_ = kComparator_moves ? std::move(s.comparator_) : s.comparator_;
+        if constexpr(kComparator_moves){
+            comparator_ = std::move(s.comparator_);
+        }else{
+            comparator_ = s.comparator_;
+        }
         alloc_ = std::move(s.alloc_);
         node_alloc_ = std::move(s.node_alloc_);
         s.size_ = 0;
@@ -232,7 +265,7 @@ public:
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
      */
-    std::pair<iterator, bool> insert(value_type& value) {
+    std::pair<iterator, bool> insert(const value_type& value) {
         auto it = find(value);
         if (it != end()) {
             return std::make_pair(it, false);
@@ -247,7 +280,7 @@ public:
      * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
      * to existing node
      */
-    std::pair<iterator, bool> insert(value_type&& value){
+    std::pair<iterator, bool> insert(T&& value){
         auto it = find(value);
         if (it != end()) {
             return std::make_pair(it, false);
@@ -383,16 +416,16 @@ public:
             root_ = nullptr;
         }
         size_ = 0;
-
     }
-
-    constexpr typename std::enable_if<std::is_copy_constructible<key_compare>::value, key_compare>::type key_comp() const {
+    template <typename U = key_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
+    key_compare key_comp() const {
+        return comparator_;
+    }
+    template <typename U = value_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
+    key_compare value_comp() const {
         return comparator_;
     }
 
-    constexpr typename std::enable_if<std::is_copy_constructible<value_compare>::value, key_compare>::type value_comp() const {
-        return comparator_;
-    }
     constexpr allocator_type get_allocator()const noexcept{
         return alloc_;
     }
@@ -400,26 +433,32 @@ public:
     bool operator==(const set& rhs) const{
         if (size_ != rhs.size_)
             return false;
-        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end()) &&
-        !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+        auto it1 = begin();
+        auto it2 = rhs.begin();
+        while (it1 != end() && it2 != rhs.end()) {
+            if (*it1 != *it2) {
+                return false;
+            }
+            ++it1;
+            ++it2;
+        }
+        return true;
     }
+
     bool operator!=(const set& rhs) const{
-        if (size_ != rhs.size_)
-            return true;
-        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end()) || //perepisat
-               !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+        return !(*this = rhs);
     }
     bool operator<(const set& rhs) const{
         return std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end());
     }
     bool operator>(const set& rhs) const{
-        return std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+        return rhs < *this;
     }
     bool operator>=(const set& rhs) const{
-        return !std::lexicographical_compare(begin(), end(), rhs.begin(), rhs.end());
+        return !(*this < rhs);
     }
     bool operator<=(const set& rhs) const{
-        return !std::lexicographical_compare(rhs.begin(), rhs.end(), begin(), end());
+        return !(rhs < *this);
     }
 
 protected:
@@ -428,7 +467,7 @@ protected:
      * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
      * rebalancing.
      */
-    bool SafeCompare(const value_type lhs, const value_type rhs) const{
+    bool SafeCompare(const value_type& lhs, const value_type& rhs) const{
          try{
              return comparator_(lhs, rhs);
          }catch(...){
@@ -714,7 +753,11 @@ protected:
 
 
 private:
-    static constexpr const bool kComparator_moves = std::is_nothrow_move_constructible_v<Compare> || !std::is_copy_constructible_v<Compare>;
+    static constexpr const std::conditional_t<
+            std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
+            std::true_type,
+            std::false_type
+    > kComparator_moves{};
     size_type size_;
     Node * root_;
     /**

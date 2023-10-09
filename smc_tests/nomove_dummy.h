@@ -4,25 +4,29 @@
 namespace s21{
     class NoMoveDummyT{
     public:
-        NoMoveDummyT();
+        NoMoveDummyT() = default;
         NoMoveDummyT(int y) : x(y){}
         NoMoveDummyT(NoMoveDummyT&&) = delete;
+        NoMoveDummyT(const NoMoveDummyT& other){x = other.x;};
+        NoMoveDummyT& operator=(const NoMoveDummyT& other){x = other.x; return * this;};
         NoMoveDummyT& operator=(NoMoveDummyT&&) = delete;
-    private:
+        const bool operator<(const NoMoveDummyT& rhs) const{
+            return x < rhs.x;
+        }
         int x;
     };
     template<typename T>
     class NoMoveDummyComp{
     public:
-        NoMoveDummyComp();
+        NoMoveDummyComp() = default;
         NoMoveDummyComp(int y) : x(y){}
         NoMoveDummyComp(NoMoveDummyComp&&) = delete;
         NoMoveDummyComp& operator=(NoMoveDummyComp&&) = delete;
+        NoMoveDummyComp(const NoMoveDummyComp& other){x = other.x;};
+        NoMoveDummyComp& operator=(const NoMoveDummyComp& other){x = other.x; return * this;};
         bool operator()(const T &lhs, const T &rhs) const {
             return lhs < rhs;
         }
-
-    private:
         int x;
     };
 }

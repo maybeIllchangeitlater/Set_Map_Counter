@@ -1,15 +1,17 @@
 #ifndef S21_CONTAINERS_SMC_TESTS_NODEFAULT_DUMMY_TEST_H_
 #define S21_CONTAINERS_SMC_TESTS_NODEFAULT_DUMMY_TEST_H_
-
+#include <type_traits>
+#include <iostream>
 namespace s21{
     class NoDefaultDummyT{
     public:
         NoDefaultDummyT() = delete;
         NoDefaultDummyT(int y) : x(y){}
+        NoDefaultDummyT(const NoDefaultDummyT& other) : x(other.x){}
+        NoDefaultDummyT(NoDefaultDummyT&& other) noexcept : x(std::move(other.x)) {}
         const bool operator<(const NoDefaultDummyT& rhs) const{
             return x < rhs.x;
         }
-    private:
         int x;
     };
     template<typename T>
@@ -17,11 +19,17 @@ namespace s21{
     public:
         NoDefaultDummyComp() = delete;
         NoDefaultDummyComp(int y) : x(y){}
+        NoDefaultDummyComp(const NoDefaultDummyComp& other) : x(other.x){}
+        NoDefaultDummyComp(NoDefaultDummyComp&& other) noexcept : x(std::move(other.x)) {}
+
+        template<typename U = NoDefaultDummyComp<T>>
+        void check(){
+            if(std::is_copy_constructible_v<U>)
+                std::cout << "COPY ME";
+        }
         bool operator()(const T &lhs, const T &rhs) const {
             return lhs < rhs;
         }
-
-    private:
         int x;
     };
 }

@@ -8,7 +8,6 @@ namespace s21{
         NoCopyDummyT(int y) : x(y){}
         NoCopyDummyT(NoCopyDummyT&) {throw std::exception();};
         NoCopyDummyT& operator=(NoCopyDummyT&) {throw std::exception();};
-    private:
         int x;
     };
     template<typename T>
@@ -21,8 +20,6 @@ namespace s21{
         bool operator()(const T &lhs, const T &rhs) const {
             return lhs < rhs;
         }
-
-    private:
         int x;
     };
 }
