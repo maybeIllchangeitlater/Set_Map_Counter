@@ -8,8 +8,8 @@ namespace s21{
         NoCopyDummyT(int y) : x(y){}
         NoCopyDummyT(NoCopyDummyT&& other) noexcept {x = other.x;}
         NoCopyDummyT& operator=(NoCopyDummyT&& other) noexcept{x = other.x; return *this;}
-        NoCopyDummyT(NoCopyDummyT&) = delete;
-        NoCopyDummyT& operator=(NoCopyDummyT&) = delete;
+        NoCopyDummyT(const NoCopyDummyT&) = delete;
+        NoCopyDummyT& operator=(const NoCopyDummyT&) = delete;
         const bool operator<(const NoCopyDummyT& rhs) const{
             return x < rhs.x;
         }
@@ -20,8 +20,8 @@ namespace s21{
     public:
         NoCopyDummyComp() = default;
         NoCopyDummyComp(int y) : x(y){}
-        NoCopyDummyComp(NoCopyDummyComp&) = delete;
-        NoCopyDummyComp& operator=(NoCopyDummyComp&) = delete;
+        NoCopyDummyComp(const NoCopyDummyComp&) = delete;
+        NoCopyDummyComp& operator=(const NoCopyDummyComp&) = delete;
         NoCopyDummyComp(NoCopyDummyComp&& other)noexcept{x = other.x;}
         NoCopyDummyComp& operator=(NoCopyDummyComp&& other)noexcept{x = other.x; return *this;}
         bool operator()(const T &lhs, const T &rhs) const {

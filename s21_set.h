@@ -156,7 +156,7 @@ public:
      * can be constructed through non-rebound alloc
      * @param alloc instance of template type
      */
-    explicit set(const Allocator& alloc ) :
+    explicit set(const Allocator& alloc) :
     size_(0), root_(nullptr), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc){}
 
     set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
