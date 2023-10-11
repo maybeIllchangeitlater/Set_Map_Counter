@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <ctype.h>
+#include <type_traits>
 
 /**
  * @brief usable with LLVM (clang++) compiler RBTrees but not with GNU (GCC) compilers\n
@@ -27,8 +28,13 @@ namespace s21 {
 
 
         MyTreeAllocator() noexcept {
+#ifdef DEBUG_SUS_TREE_ALLOC_
+            std::cout << "allocated array size is " << for_deletion_.size() << std::endl;
+#endif
             ++ref_count_;
-//            std::cout << "new allocator, refcount is: " << ref_count_ << std::endl;
+#ifdef DEBUG_SUS_TREE_ALLOC_
+            std::cout << "new allocator of type " <<typeid(T).name() << "refcount is: " << ref_count_ << std::endl;
+#endif
         }
 
         MyTreeAllocator(const MyTreeAllocator&) noexcept : MyTreeAllocator() {}
@@ -54,6 +60,7 @@ namespace s21 {
 
         template <typename U>
         MyTreeAllocator& operator=(const MyTreeAllocator<U>&) noexcept {
+            ++ref_count_;
             return *this;
         }
         template<typename U>
@@ -68,13 +75,18 @@ namespace s21 {
          */
         ~MyTreeAllocator() {
             --ref_count_;
-//            std::cout << "allocator dies, refcount is: " << ref_count_ << std::endl;
+#ifdef DEBUG_SUS_TREE_ALLOC_
+            std::cout << "allocator allocator of type" <<typeid(T).name() <<" dies, refcount is: " << ref_count_ << std::endl;
+#endif
             if (!ref_count_) {
-                int n = for_deletion_.size();
-                for (int i = 0; i < n; ++i) {
-//                    std::cout << "ABOBA DOESNT LEAK" << std::endl;
+                for (size_type i = 0; i < taken_ && for_deletion_[i]; ++i) {
                     ::operator delete[](for_deletion_[i]);
+                    for_deletion_[i] = nullptr;
                 }
+                std::cout << reusable_ << std::endl;
+                taken_ = 0;
+                reusable_ = nullptr;
+                allocate_this_ = 8;
             }
         }
 
@@ -99,16 +111,19 @@ namespace s21 {
                 throw std::bad_alloc();
             }
             if (!reusable_ || !reusable_->__left_) {
-                for_deletion_.push_back(
-                        static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_)));
-                for_deletion_.back()[0].__left_ = nullptr;
+#ifdef DEBUG_SUS_TREE_ALLOC_
+                std::cout << "allocating new " << n * allocate_this_ << " memory for " typeid(T).name() << std::endl;
+#endif
+                for_deletion_[taken_] =
+                        static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_));
+                for_deletion_[taken_][0].__left_ = nullptr;
                 for (size_type i = 1; i < allocate_this_ * n; ++i)
-                    for_deletion_.back()[i].__left_ = &(for_deletion_.back()[i - 1]);
-
-                reusable_ ? reusable_->__left_ = &(for_deletion_.back()[allocate_this_ - 1]) :
-                        reusable_ = &(for_deletion_.back()[allocate_this_ - 1]);
+                    for_deletion_[taken_][i].__left_ = &(for_deletion_[taken_][i - 1]);
+                reusable_ ? reusable_->__left_ = &(for_deletion_[taken_][allocate_this_ - 1]) :
+                        reusable_ = &(for_deletion_[taken_][allocate_this_ - 1]);
 
                 allocate_this_ *= alloc_factor_ * n;
+                ++taken_;
             }
 
             auto ret = reusable_->__left_;
@@ -153,27 +168,32 @@ namespace s21 {
         template <typename U>
         bool operator!=(const MyTreeAllocator<U>&) const noexcept { return false; }
 
-        pointer address(reference r) { return &r; } //very questionable
+        pointer address(reference r) { return &r; }
         const_pointer address(const_reference s) { return &s; }
 
     private:
         constexpr static const float alloc_factor_ = 1.5;
-        static size_type allocate_this_;
+        constexpr static const size_type kMaxMemory = 200;
         static pointer reusable_;
-        static std::vector<pointer> for_deletion_;
+        static pointer for_deletion_[kMaxMemory];
+        static size_type allocate_this_;
         static size_type ref_count_;
+        static size_type taken_;
 
     };
 
-////// inits refcount and vec for allocator so it can be reused and is not destroyed by 1 set if 3 sets are using it
+////// inits refcount and array for allocator so it can be reused and is not destroyed by 1 set if 3 sets are using it
+///// no check for array size cuz you'll guaranteed to get bad alloc from system before taking all 8 * 2 ^ 200
     template<typename T>
-    typename MyTreeAllocator<T>::size_type MyTreeAllocator<T>::allocate_this_ = 10;
+    typename MyTreeAllocator<T>::size_type MyTreeAllocator<T>::allocate_this_ = 8;
     template<typename T>
     typename MyTreeAllocator<T>::pointer MyTreeAllocator<T>::reusable_ = nullptr;
     template<typename T>
     size_t MyTreeAllocator<T>::ref_count_ = 0;
     template<typename T>
-    std::vector<typename MyTreeAllocator<T>::pointer> MyTreeAllocator<T>::for_deletion_;
+    size_t MyTreeAllocator<T>::taken_ = 0;
+    template <typename T>
+    typename MyTreeAllocator<T>::pointer MyTreeAllocator<T>::for_deletion_[kMaxMemory];
 } //namespace s21
 
 #endif //S21_CONTAINERS_TREEALLOCATOR_H_

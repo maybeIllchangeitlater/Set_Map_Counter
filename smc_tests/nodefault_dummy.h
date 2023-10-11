@@ -9,7 +9,7 @@ namespace s21{
         NoDefaultDummyT(int y) : x(y){}
         NoDefaultDummyT(const NoDefaultDummyT& other) : x(other.x){}
         NoDefaultDummyT(NoDefaultDummyT&& other) noexcept : x(std::move(other.x)) {}
-        const bool operator<(const NoDefaultDummyT& rhs) const{
+        bool operator<(const NoDefaultDummyT& rhs) const{
             return x < rhs.x;
         }
         int x;

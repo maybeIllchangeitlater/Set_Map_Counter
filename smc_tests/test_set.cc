@@ -1,244 +1,184 @@
 #include <gtest/gtest.h>
-#include "dummy_collection.h"
-#include "../s21_set.h"
 #include <string>
+#include <vector>
+#include "../s21_set.h"
+#include "dummy_collection.h"
 #include "s21_matrix_oop.h"
 
+//struct SetTest {
+//    s21::set<S21::S21Matrix, std::greater<>, std::allocator<S21::S21Matrix>> set_matrix_stdalloc;
+//    s21::set<const char*> set_cstring_myalloc;
+//    s21::set<s21::NoDefaultDummyT, s21::MyComparator<s21::NoDefaultDummyT>, std::allocator<s21::NoDefaultDummyT>> set_nodef_stdalloc;
+//    s21::set<s21::NoCopyDummyT> set_nocopy_myalloc;
+//    s21::set<s21::NoMoveDummyT, std::less<s21::NoMoveDummyT>, std::allocator<s21::NoMoveDummyT>> set_nomove_stdalloc;
+//    s21::set<std::vector<int>> set_vector_myalloc;
+//};
+//
 
-TEST(ConstructorsAndAssignments, DefaultConstructorMyAlloc){
-    s21::set<int> a;
-    s21::set<int, std::less<>> b;
-    s21::set<s21::NoDefaultDummyT> c;
-    s21::set<s21::set<int>> d;
-    s21::set<s21::set<s21::set<int>>> dd;
-    std::set<s21::set<std::set<s21::set<int>>>> ee;
-    s21::NoDefaultDummyT for_c(4);
-    a.insert(1);
-    b.insert(2);
-    c.insert(s21::NoDefaultDummyT(3));
-    c.insert(for_c);
-    d.insert(a);
-    dd.insert(d);
+class SetTest :  public ::testing::Test {
+protected:
+//    void SetUp() override {
+//        set_matrix_myalloc.clear();
+//        set_nocopy_myalloc.clear();
+//        set_vector_myalloc.clear();
+//        set_string_stdalloc.clear();
+//        set_nodef_stdalloc.clear();
+//        set_nomove_stdalloc.clear();
+//    }
 
-    ASSERT_EQ(*a.begin(), 1);
-    ASSERT_EQ(*b.begin(), 2);
-    ASSERT_EQ((*c.begin()).x, 3);
-    ASSERT_EQ((*(++c.begin())).x, 4);
+//     void TearDown() override {
+//         set_matrix_myalloc.clear();
+//        set_nocopy_myalloc.clear();
+//        set_vector_myalloc.clear();
+//        set_string_stdalloc.clear();
+//        set_nodef_stdalloc.clear();
+//        set_nomove_stdalloc.clear();
+//}
 
-    ASSERT_EQ(*(d.begin()->begin()), *a.begin());
-    ASSERT_EQ(*(dd.begin()->begin()->begin()), *a.begin());
-}
+    s21::set<S21::S21Matrix> set_matrix_myalloc;
+    s21::set<s21::NoCopyDummyT> set_nocopy_myalloc;
+    s21::set<std::vector<int>> set_vector_myalloc;
+    s21::set<std::string, std::less<>, std::allocator<std::string>> set_string_stdalloc;
+    s21::set<s21::NoDefaultDummyT, s21::MyComparator<s21::NoDefaultDummyT>, std::allocator<s21::NoDefaultDummyT>> set_nodef_stdalloc;
+    s21::set<s21::NoMoveDummyT, std::less<s21::NoMoveDummyT>, std::allocator<s21::NoMoveDummyT>> set_nomove_stdalloc;
 
-TEST(ConstructorsAndAssignments, DefaultConstructorSTDAlloc){
-    s21::set<int, s21::MyComparator<int>, std::allocator<int>> a;
-    s21::set<int, std::less<>, std::allocator<int>> b;
-    s21::set<s21::NoDefaultDummyT, s21::MyComparator<s21::NoDefaultDummyT>, std::allocator<s21::NoDefaultDummyT>> c;
-    s21::NoDefaultDummyT for_c(4);
-    a.insert(1);
-    b.insert(2);
-    c.insert(s21::NoDefaultDummyT(3));
-    c.insert(for_c);
+};
 
-    ASSERT_EQ(*a.begin(), 1);
-    ASSERT_EQ(*b.begin(), 2);
-    ASSERT_EQ((*c.begin()).x, 3);
-    ASSERT_EQ((*(++c.begin())).x, 4);
-}
+TEST_F(SetTest, insert_lvalue){
+    S21::S21Matrix ins_m1(3,3);
+    S21::S21Matrix ins_m2(4,4);
+    S21::S21Matrix ins_m3(3,3);
+    set_matrix_myalloc.insert(ins_m1);
+    set_matrix_myalloc.insert(ins_m2);
+    set_matrix_myalloc.insert(ins_m3);
 
-TEST(ConstructorsAndAssignments, ComparatorAndAllocatorBasedConstructors){
+    std::vector<int> ins_v1{1,2,3,4};
+    std::vector<int> ins_v2{1,2,3,4};
+    std::vector<int> ins_v3{1,2,3,4,4};
+    set_vector_myalloc.insert(ins_v1);
+    set_vector_myalloc.insert(ins_v2);
+    set_vector_myalloc.insert(ins_v3);
 
-    std::allocator<S21::S21Matrix> std_matrix_alloc;
-    s21::MyTreeAllocator<std::string> my_string_alloc;
-    s21::NoDefaultDummyComp<S21::S21Matrix> no_default_matrix_comp(3);
-    s21::NoDefaultDummyComp<std::string> no_default_string_comp(3);
+    std::string ins_cs1 = "aboba";
+    std::string ins_cs2 = "aboba";
+    std::string ins_cs3 = "boba";
+    set_string_stdalloc.insert(ins_cs1);
+    set_string_stdalloc.insert(ins_cs2);
+    set_string_stdalloc.insert(ins_cs3);
 
-    s21::set<S21::S21Matrix, s21::NoDefaultDummyComp<S21::S21Matrix>, std::allocator<S21::S21Matrix>> set_std_alloc(no_default_matrix_comp, std_matrix_alloc);
-    s21::set<std::string, s21::NoDefaultDummyComp<std::string>> set_my_alloc(no_default_string_comp, my_string_alloc);
-    s21::set<std::string> set_my_alloc_only(my_string_alloc);
+    s21::NoDefaultDummyT ins_ndd1(3);
+    s21::NoDefaultDummyT ins_ndd2(3);
+    s21::NoDefaultDummyT ins_ndd3(4);
+    set_nodef_stdalloc.insert(ins_ndd1);
+    set_nodef_stdalloc.insert(ins_ndd2);
+    set_nodef_stdalloc.insert(ins_ndd3);
 
-    set_std_alloc.emplace(4,4);
-    set_std_alloc.emplace(3,3);
-    set_std_alloc.emplace(1,1);
-    set_my_alloc.emplace("a");
-    set_my_alloc.emplace("b");
-    set_my_alloc.emplace("c");
-    set_my_alloc_only.emplace("a");
-    set_my_alloc_only.emplace("b");
-    set_my_alloc_only.emplace("c");
+    s21::NoMoveDummyT ins_nmd1(3);
+    s21::NoMoveDummyT ins_nmd2(4);
+    s21::NoMoveDummyT ins_nmd3(3);
+    set_nomove_stdalloc.insert(ins_nmd1);
+    set_nomove_stdalloc.insert(ins_nmd2);
+    set_nomove_stdalloc.insert(ins_nmd3);
 
-    ASSERT_EQ(set_std_alloc.get_allocator(), std_matrix_alloc);
-    ASSERT_EQ(set_my_alloc.get_allocator(), my_string_alloc);
-
-    ASSERT_EQ(set_std_alloc.begin()->GetRows(), 1);
-    ASSERT_STREQ(set_my_alloc.begin()->c_str(), "a");
-    ASSERT_EQ(*set_my_alloc.begin(), *set_my_alloc_only.begin());
-
-}
-
-TEST(ConstructorsAndAssignments, InitlistConstructor{) }
-
-TEST(ConstructorsAndAssignments, CopyConstructorMyAlloc){
-    s21::NoDefaultDummyComp<S21::S21Matrix> comparator_no_def(3);
-    s21::set<S21::S21Matrix, s21::NoDefaultDummyComp<S21::S21Matrix>> matrix_set(comparator_no_def);
-    matrix_set.emplace(3,3);
-    matrix_set.emplace(3,3);
-    matrix_set.emplace(2,2);
-
-
-    s21::set<S21::S21Matrix, s21::NoDefaultDummyComp<S21::S21Matrix>>matrix_set_copy(matrix_set);
-
-    ASSERT_EQ(matrix_set.begin()->GetRows(), 2);
-    ASSERT_EQ((++matrix_set.begin())->GetRows(), 3);
+    ASSERT_EQ(set_matrix_myalloc.size(), set_vector_myalloc.size());
+    ASSERT_EQ(set_vector_myalloc.size(), set_string_stdalloc.size());
+    ASSERT_EQ(set_string_stdalloc.size(), set_nodef_stdalloc.size());
+    ASSERT_EQ(set_nodef_stdalloc.size(), set_nomove_stdalloc.size());
+    ASSERT_EQ(set_nomove_stdalloc.size(), 2);
 
 
-    ASSERT_EQ(matrix_set_copy.begin()->GetRows(), 2);
-    ASSERT_EQ((++matrix_set_copy.begin())->GetRows(), 3);
+    set_matrix_myalloc.emplace(3,3);
+    set_matrix_myalloc.insert(ins_m1);
+    set_matrix_myalloc.insert(S21::S21Matrix(3,3));
+    set_matrix_myalloc.insert(S21::S21Matrix(4,4));
 
-}
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4});
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4});
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4,5});
 
-TEST(ConstructorsAndAssignments, CopyConstructorSTDAlloc){
-    s21::NoDefaultDummyComp<S21::S21Matrix> comparator_no_def(3);
-    s21::set<S21::S21Matrix, s21::NoDefaultDummyComp<S21::S21Matrix>, std::allocator<S21::S21Matrix>> matrix_set(comparator_no_def);
-    matrix_set.emplace(3,3);
-    matrix_set.emplace(3,3);
-    matrix_set.emplace(2,2);
+    set_string_stdalloc.insert("aboba");
+    set_string_stdalloc.insert("aboba");
+    set_string_stdalloc.insert("boba");
 
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(3));
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(3));
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(4));
 
-    s21::set<S21::S21Matrix, s21::NoDefaultDummyComp<S21::S21Matrix>, std::allocator<S21::S21Matrix>>matrix_set_copy(matrix_set);
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(3));
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(3));
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(4));
 
-    ASSERT_EQ(matrix_set.begin()->GetRows(), 2);
-    ASSERT_EQ((++matrix_set.begin())->GetRows(), 3);
+    auto smm_it = set_matrix_myalloc.begin();
+    auto svm_it = set_vector_myalloc.begin();
+    auto sss_it = set_string_stdalloc.begin();
+    auto snm_it = set_nocopy_myalloc.begin();
+    auto sns_it = set_nodef_stdalloc.begin();
 
+    ASSERT_EQ(smm_it++->GetRows(), 3);
+    ASSERT_EQ(smm_it->GetRows(), 4);
 
-    ASSERT_EQ(matrix_set_copy.begin()->GetRows(), 2);
-    ASSERT_EQ((++matrix_set_copy.begin())->GetRows(), 3);
+    ASSERT_EQ((*svm_it)[3], 4);
+    ASSERT_EQ((*++svm_it)[4], 4);
+    ASSERT_EQ((*++svm_it)[4], 5);
 
-}
+    ASSERT_STREQ(sss_it->c_str(), "aboba");
+    ASSERT_STREQ((++sss_it)->c_str(), "boba");
 
-TEST(ConstructorsAndAssignments, CopyOperatorMyAlloc){
-    s21::set<s21::NoMoveDummyT> no_move_set;
-    s21::set<s21::NoMoveDummyT> no_move_set_copy;
-    no_move_set.emplace(3);
-    no_move_set.emplace(4);
-    no_move_set.emplace(5);
-    no_move_set_copy = no_move_set;
+    ASSERT_EQ(snm_it->x, 3);
+    ASSERT_EQ((++snm_it)->x, 4);
 
-    auto it = no_move_set.begin();
-    auto it2 = no_move_set_copy.begin();
-    ASSERT_EQ(it->x, 3);
-    ASSERT_EQ(it++->x, it2++->x);
-    ASSERT_EQ(it->x, 4);
-    ASSERT_EQ(it++->x, it2++->x);
-    ASSERT_EQ(it->x, 5);
-    ASSERT_EQ(it++->x, it2++->x);
+    ASSERT_EQ(sns_it->x, 3);
+    ASSERT_EQ((++sns_it)->x, 4);
+
 
 }
 
-TEST(ConstructorsAndAssignments, CopyOperatorSTDAlloc){
-    s21::set<s21::NoMoveDummyT, s21::MyComparator<s21::NoMoveDummyT>, std::allocator<s21::NoMoveDummyT>> no_move_set;
-    s21::set<s21::NoMoveDummyT, s21::MyComparator<s21::NoMoveDummyT>, std::allocator<s21::NoMoveDummyT>> no_move_set_copy;
-    no_move_set.emplace(3);
-    no_move_set.emplace(4);
-    no_move_set.emplace(5);
-    no_move_set_copy = no_move_set;
+TEST_F(SetTest, insert_rvalue){
+    set_matrix_myalloc.find(S21::S21Matrix(3,3));
+    set_matrix_myalloc.emplace(3,3);
+    set_matrix_myalloc.find(S21::S21Matrix(3,3));
+    S21::S21Matrix ins_m1(3,3);
+    set_matrix_myalloc.insert(ins_m1);
+    set_matrix_myalloc.insert(S21::S21Matrix(3,3));
+    set_matrix_myalloc.insert(S21::S21Matrix(4,4));
 
-    auto it = no_move_set.begin();
-    auto it2 = no_move_set_copy.begin();
-    ASSERT_EQ(it->x, 3);
-    ASSERT_EQ(it++->x, it2++->x);
-    ASSERT_EQ(it->x, 4);
-    ASSERT_EQ(it++->x, it2++->x);
-    ASSERT_EQ(it->x, 5);
-    ASSERT_EQ(it++->x, it2++->x);
-}
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4});
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4});
+    set_vector_myalloc.insert(std::vector<int>{1,2,3,4,5});
 
-TEST(ConstructorsAndAssignments, MoveConstructorMyAlloc){
-    s21::set<std::string, s21::NoCopyDummyComp<std::string>> string_set;
-    string_set.emplace("biba");
-    string_set.emplace("boba");
-    string_set.emplace("aboba");
-    s21::set<std::string, s21::NoCopyDummyComp<std::string>> string_set_copy(std::move(string_set));
+    set_string_stdalloc.insert("aboba");
+    set_string_stdalloc.insert("aboba");
+    set_string_stdalloc.insert("boba");
 
-    s21::set<std::string, s21::NoMoveDummyComp<std::string>> string_set2;
-    string_set2.emplace("biba");
-    string_set2.emplace("boba");
-    string_set2.emplace("aboba");
-    s21::set<std::string, s21::NoMoveDummyComp<std::string>> string_set2_copy(std::move(string_set2));
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(3));
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(3));
+    set_nocopy_myalloc.insert(s21::NoCopyDummyT(4));
 
-    auto it1 = string_set_copy.begin();
-    auto it2 = string_set2_copy.begin();
-    ASSERT_EQ(*it1++, *it2++);
-    ASSERT_EQ(*it1++, *it2++);
-    ASSERT_EQ(*it1++, *it2++);
-}
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(3));
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(3));
+    set_nodef_stdalloc.insert(s21::NoDefaultDummyT(4));
 
-TEST(ConstructorsAndAssignments, MoveConstructorSTDAlloc){
-    s21::set<std::string, s21::NoCopyDummyComp<std::string>, std::allocator<std::string>> string_set;
-    string_set.emplace("biba");
-    string_set.emplace("boba");
-    string_set.emplace("aboba");
-    s21::set<std::string, s21::NoCopyDummyComp<std::string>, std::allocator<std::string>> string_set_copy(std::move(string_set));
+    auto smm_it = set_matrix_myalloc.begin();
+    auto svm_it = set_vector_myalloc.begin();
+    auto sss_it = set_string_stdalloc.begin();
+    auto snm_it = set_nocopy_myalloc.begin();
+    auto sns_it = set_nodef_stdalloc.begin();
 
-    s21::set<std::string, s21::NoMoveDummyComp<std::string>, std::allocator<std::string>> string_set2;
-    string_set2.emplace("biba");
-    string_set2.emplace("boba");
-    string_set2.emplace("aboba");
-    s21::set<std::string, s21::NoMoveDummyComp<std::string>, std::allocator<std::string>> string_set2_copy(std::move(string_set2));
+    ASSERT_EQ(smm_it++->GetRows(), 3);
+    ASSERT_EQ(smm_it->GetRows(), 4);
 
-    auto it1 = string_set_copy.begin();
-    auto it2 = string_set2_copy.begin();
-    ASSERT_EQ(*it1++, *it2++);
-    ASSERT_EQ(*it1++, *it2++);
-    ASSERT_EQ(*it1++, *it2++);
+    ASSERT_EQ((*svm_it)[3], 4);
+    ASSERT_EQ((*++svm_it)[4], 5);
 
-}
+    ASSERT_STREQ(sss_it->c_str(), "aboba");
+    ASSERT_STREQ((++sss_it)->c_str(), "boba");
 
-TEST(ConstructorsAndAssignments, MoveOperatorMyAlloc){
-    s21::set<double, s21::NoCopyDummyComp<double>> set_m;
-    set_m.insert(1.0);
-    set_m.insert(-1.0);
-    set_m.insert(0.0);
-    s21::set<double, s21::NoCopyDummyComp<double>> set_m_copy;
+    ASSERT_EQ(snm_it->x, 3);
+    ASSERT_EQ((++snm_it)->x, 4);
 
-    set_m_copy = std::move(set_m);
+    ASSERT_EQ(sns_it->x, 3);
+    ASSERT_EQ((++sns_it)->x, 4);
 
-    s21::set<double, s21::NoMoveDummyComp<double>> set_m2;
-    set_m2.insert(1.0);
-    set_m2.insert(-1.0);
-    set_m2.insert(0.0);
-    s21::set<double, s21::NoMoveDummyComp<double>> set_m2_copy;
-
-    set_m2_copy = std::move(set_m2);
-
-    auto itt1 = set_m_copy.begin();
-    auto itt2 = set_m2_copy.begin();
-    ASSERT_EQ(*itt1++, *itt2++);
-    ASSERT_EQ(*itt1++, *itt2++);
-    ASSERT_EQ(*itt1++, *itt2++);
-}
-
-TEST(ConstructorsAndAssignments, MoveOperatorSTDAlloc){
-    s21::set<double, s21::NoCopyDummyComp<double>, std::allocator<double>> set_m;
-    set_m.insert(1.0);
-    set_m.insert(-1.0);
-    set_m.insert(0.0);
-    s21::set<double, s21::NoCopyDummyComp<double>, std::allocator<double>> set_m_copy;
-
-    set_m_copy = std::move(set_m);
-
-    s21::set<double, s21::NoMoveDummyComp<double>, std::allocator<double>> set_m2;
-    set_m2.insert(1.0);
-    set_m2.insert(-1.0);
-    set_m2.insert(0.0);
-    s21::set<double, s21::NoMoveDummyComp<double>, std::allocator<double>> set_m2_copy;
-
-    set_m2_copy = std::move(set_m2);
-
-    auto itt1 = set_m_copy.begin();
-    auto itt2 = set_m2_copy.begin();
-    ASSERT_EQ(*itt1++, *itt2++);
-    ASSERT_EQ(*itt1++, *itt2++);
-    ASSERT_EQ(*itt1++, *itt2++);
 }
 
 int main(int argc, char** argv) {

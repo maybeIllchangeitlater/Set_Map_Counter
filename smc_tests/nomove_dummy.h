@@ -10,7 +10,7 @@ namespace s21{
         NoMoveDummyT(const NoMoveDummyT& other){x = other.x;};
         NoMoveDummyT& operator=(const NoMoveDummyT& other){x = other.x; return * this;};
         NoMoveDummyT& operator=(NoMoveDummyT&&) = delete;
-        const bool operator<(const NoMoveDummyT& rhs) const{
+        bool operator<(const NoMoveDummyT& rhs) const{
             return x < rhs.x;
         }
         int x;

@@ -45,11 +45,7 @@ public:
     using value_compare = key_compare;
     using const_reference = const T &;
     using size_type = size_t;
-    using comparator_moves = std::conditional_t<
-            std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
-            std::true_type,
-            std::false_type
-    >;
+
     class SetIterator {
     public:
         using iterator = SetIterator;
@@ -60,11 +56,11 @@ public:
         using value_type = const T;
 
 
-        SetIterator() = default;
+        SetIterator() = delete;
 
         explicit SetIterator(Node *n) : n_(n) {}
 
-        virtual ~SetIterator() = default;
+        ~SetIterator() = default;
 
 
         reference operator*() const {
@@ -128,7 +124,6 @@ public:
 
     protected:
         Node *n_;
-        friend class s21::set<T>;
     };
 
     using iterator = SetIterator;
@@ -161,8 +156,7 @@ public:
 
     set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
     set(comp, alloc){
-        for (auto &v: init)
-            EmplaceAppend(std::move(v));
+        insert(init);
     }
 
     set(std::initializer_list<value_type> init, const Allocator& alloc) : set(init, Compare(), alloc) {}
@@ -302,6 +296,10 @@ public:
             }
         }
     }
+    /**
+     * @brief not just reusing iterator insert because ilist is unlikely to contain dupes (unless testing) and we
+     * can freely move from ilist
+     */
     void insert(std::initializer_list<value_type> ilist ){
         for(auto & v: ilist){
             EmplaceAppend(std::move(v));
@@ -337,6 +335,40 @@ public:
 
     bool contains(reference value) const noexcept{
         return Search(value);
+    }
+    /**
+     * @brief Returns an iterator pointing to the first element that is not less than key
+     */
+    iterator lower_bound(const key_type& key) const noexcept{
+        Node* tmp = root_;
+        Node* result = nullptr;
+        while (tmp){
+            if (!SafeCompare(tmp->__key_, key)){
+                result = tmp;
+                tmp = tmp->__left_;
+            }
+            else {
+                tmp = tmp->__right_;
+            }
+        }
+        return iterator(result);
+    }
+    /**
+     * @brief Returns an iterator pointing to the first element that is greater than key
+     */
+    iterator upper_bound(const key_type& key) const noexcept {
+        Node* tmp = root_;
+        Node* result = nullptr;
+        while (tmp){
+            if (SafeCompare(key, tmp->__key_)){
+                result = tmp;
+                tmp = tmp->__left_;
+            }
+            else {
+                tmp = tmp->__right_;
+            }
+        }
+        return iterator(result);
     }
 
     /**
@@ -479,7 +511,8 @@ protected:
     template <typename... Args>
     Node* AllocateAndConstruct(Args&&... args){
         try {
-            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+//            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+            Node* target = node_alloc_.allocate(1);
             target->__left_ = nullptr;
             target->__right_ = nullptr;
             target->__parent_ = nullptr;
@@ -559,7 +592,7 @@ protected:
         ++size_;
     }
     /**
-     * @brief void return emplace version for initlist insert and constructor
+     * @brief void return emplace version for initlist insert
      */
     template <typename... Args>
     void EmplaceAppend(Args&&... args){

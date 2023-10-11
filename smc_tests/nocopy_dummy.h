@@ -10,7 +10,7 @@ namespace s21{
         NoCopyDummyT& operator=(NoCopyDummyT&& other) noexcept{x = other.x; return *this;}
         NoCopyDummyT(const NoCopyDummyT&) = delete;
         NoCopyDummyT& operator=(const NoCopyDummyT&) = delete;
-        const bool operator<(const NoCopyDummyT& rhs) const{
+        bool operator<(const NoCopyDummyT& rhs) const{
             return x < rhs.x;
         }
         int x;
