@@ -1,6 +1,6 @@
 #ifndef S21_CONTAINERS_TREEALLOCATOR_H_
 #define S21_CONTAINERS_TREEALLOCATOR_H_
-
+//#define DEBUG_SUS_TREE_ALLOC_
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -29,7 +29,7 @@ namespace s21 {
 
         MyTreeAllocator() noexcept {
 #ifdef DEBUG_SUS_TREE_ALLOC_
-            std::cout << "allocated array size is " << for_deletion_.size() << std::endl;
+            std::cout << "allocated array size is " << taken_ << std::endl;
 #endif
             ++ref_count_;
 #ifdef DEBUG_SUS_TREE_ALLOC_
@@ -83,7 +83,9 @@ namespace s21 {
                     ::operator delete[](for_deletion_[i]);
                     for_deletion_[i] = nullptr;
                 }
+#ifdef DEBUG_SUS_TREE_ALLOC_
                 std::cout << reusable_ << std::endl;
+#endif
                 taken_ = 0;
                 reusable_ = nullptr;
                 allocate_this_ = 8;
@@ -112,7 +114,7 @@ namespace s21 {
             }
             if (!reusable_ || !reusable_->__left_) {
 #ifdef DEBUG_SUS_TREE_ALLOC_
-                std::cout << "allocating new " << n * allocate_this_ << " memory for " typeid(T).name() << std::endl;
+                std::cout << "allocating new " << n * allocate_this_ << " memory for " << typeid(T).name() << std::endl;
 #endif
                 for_deletion_[taken_] =
                         static_cast<pointer>(::operator new[](n * sizeof(value_type) * allocate_this_));
@@ -121,6 +123,8 @@ namespace s21 {
                     for_deletion_[taken_][i].__left_ = &(for_deletion_[taken_][i - 1]);
                 reusable_ ? reusable_->__left_ = &(for_deletion_[taken_][allocate_this_ - 1]) :
                         reusable_ = &(for_deletion_[taken_][allocate_this_ - 1]);
+
+                if(allocate_this_ > 1023) alloc_factor_ = 1.5;
 
                 allocate_this_ *= alloc_factor_ * n;
                 ++taken_;
@@ -149,6 +153,9 @@ namespace s21 {
          */
         template<typename U, typename... Args>
         void construct(U *ptr, Args &&... args) {
+#ifdef DEBUG_SUS_TREE_ALLOC_
+            std::cout << "constructing object of type" << typeid(U).name() << std::endl;
+#endif
             new(ptr) U(std::forward<Args>(args)...);
         }
 
@@ -172,8 +179,8 @@ namespace s21 {
         const_pointer address(const_reference s) { return &s; }
 
     private:
-        constexpr static const float alloc_factor_ = 1.5;
         constexpr static const size_type kMaxMemory = 200;
+        static float alloc_factor_;
         static pointer reusable_;
         static pointer for_deletion_[kMaxMemory];
         static size_type allocate_this_;
@@ -183,11 +190,13 @@ namespace s21 {
     };
 
 ////// inits refcount and array for allocator so it can be reused and is not destroyed by 1 set if 3 sets are using it
-///// no check for array size cuz you'll guaranteed to get bad alloc from system before taking all 8 * 2 ^ 200
     template<typename T>
-    typename MyTreeAllocator<T>::size_type MyTreeAllocator<T>::allocate_this_ = 8;
+    typename MyTreeAllocator<T>::size_type MyTreeAllocator<T>::allocate_this_ = 2;
     template<typename T>
     typename MyTreeAllocator<T>::pointer MyTreeAllocator<T>::reusable_ = nullptr;
+    template<typename T>
+    ///// *2 gets really costly really fast so it's updated to 1.5
+    float MyTreeAllocator<T>::alloc_factor_ = 8;
     template<typename T>
     size_t MyTreeAllocator<T>::ref_count_ = 0;
     template<typename T>
@@ -197,3 +206,4 @@ namespace s21 {
 } //namespace s21
 
 #endif //S21_CONTAINERS_TREEALLOCATOR_H_
+//#undef DEBUG_SUS_TREE_ALLOC_

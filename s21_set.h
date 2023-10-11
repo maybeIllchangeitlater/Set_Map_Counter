@@ -46,7 +46,7 @@ public:
     using const_reference = const T &;
     using size_type = size_t;
 
-    class SetIterator {
+    class SetIterator  {
     public:
         using iterator = SetIterator;
         using iterator_category = std::bidirectional_iterator_tag;
@@ -300,13 +300,13 @@ public:
      * @brief not just reusing iterator insert because ilist is unlikely to contain dupes (unless testing) and we
      * can freely move from ilist
      */
-    void insert(std::initializer_list<value_type> ilist ){
+    void insert(std::initializer_list<value_type> ilist){
         for(auto & v: ilist){
             EmplaceAppend(std::move(v));
         }
     }
     /**
-     * @brief removes node from a tree. does nothing if it doesnt exist
+     * @brief removes node from the tree. does nothing if it doesnt exist
      */
     void erase(reference value) {
         if (contains(value)){
@@ -315,17 +315,17 @@ public:
         }
     }
     /**
-     * @brief removes node from a tree. does nothing if it doesnt exist
+     * @brief removes node from the tree. does nothing if it doesnt exist
      */
     void erase(iterator pos) {
         erase(*pos);
     }
 
-    void erase(const_iterator first, const_iterator last){
-        while(first != last){
-            first = erase(first);
-        }
-    }
+//    void erase(const_iterator first, const_iterator last){ //fix this one
+//        while(first != last){
+//            first = erase(first);
+//        }
+//    }
     /**
      * @brief returns iterator to position of node with input value or iterator to end
      */
@@ -418,11 +418,11 @@ public:
         return iterator(nullptr);
     }
 
-    iterator begin() const {
+    const_iterator begin() const {
         return const_iterator(FindLeftmost(root_));
     }
 
-    iterator end() const{
+    const_iterator end() const{
         return const_iterator(nullptr);
     }
 
@@ -511,8 +511,7 @@ protected:
     template <typename... Args>
     Node* AllocateAndConstruct(Args&&... args){
         try {
-//            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-            Node* target = node_alloc_.allocate(1);
+            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
             target->__left_ = nullptr;
             target->__right_ = nullptr;
             target->__parent_ = nullptr;
@@ -572,16 +571,7 @@ protected:
             Add(value);
         }
     }
-    /**
-     * @brief check for node, create node, insert node.
-     */
-    void Append(value_type&& value){
-        if(!contains(value)) {
-            Node* target = AllocateAndConstruct(std::move(value));
-            root_ = Insert(root_, target);
-            ++size_;
-        }
-    }
+
     /**
      * @brief insert for copy constructor/operator. Doesn't check if node already exists
      *
@@ -769,15 +759,15 @@ protected:
         return root ? root->__height_ : 0;
     }
 
-    static Node *FindLeftmost(Node *root) {
+    static Node *FindLeftmost(Node *root) noexcept { //dereferencing nullptr is not an exception (not going to happen I hope)
         return root->__left_ ? FindLeftmost(root->__left_) : root;
     }
 
-    static Node *FindRightmost(Node *root) {
+    static Node *FindRightmost(Node *root)  noexcept{
         return root->__right_ ? FindRightmost(root->__right_) : root;
     }
 
-    Node *RebalanceFromLeft(Node *root) {
+    Node *RebalanceFromLeft(Node *root) noexcept{
         if (!root->__left_)
             return root->__right_;
         root->__left_ = RebalanceFromLeft(root->__left_);
