@@ -79,7 +79,7 @@ public:
             if (n_->__right_) {
                 n_ = FindLeftmost(n_->__right_);
             } else {
-                while (n_->__parent_ && n_->__parent_->__right_ == n_) {
+                while (n_->__parent_->__parent_ && n_->__parent_->__right_ == n_) {
                     n_ = n_->__parent_;
                 }
                 n_ = n_->__parent_;
@@ -95,11 +95,12 @@ public:
             if (n_->__left_) {
                 n_ = FindRightmost(n_->__left_);
             } else {
-                while (n_->__parent_ && n_->__parent_->__left_ == n_) {
+                while (n_->__parent_->__parent_ && n_->__parent_->__left_ == n_) {
                     n_ = n_->__parent_;
                 }
                 n_ = n_->__parent_;
             }
+            return *this;
         }
 
         iterator operator++(int) {
@@ -130,9 +131,8 @@ public:
     using const_iterator = SetIterator;
 
 
-    set() : size_(0), root_(nullptr), comparator_(Compare()), alloc_(), node_alloc_(alloc_) {
-        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-        root_->__parent_ = root_;
+    set() : size_(0), comparator_(Compare()), alloc_(), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
+        InitNode(fake_root_);
     }
 
     /**
@@ -144,10 +144,9 @@ public:
      * @param comp instance of template type
      * @param alloc instance of template type or default constructed template alloc by default
      */
-    explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0),
-    root_(nullptr), comparator_(comp), alloc_(alloc), node_alloc_(alloc){
-        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-        root_->__parent_ = root_;
+    explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0), comparator_(comp), alloc_(alloc), node_alloc_(alloc),
+    fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)){
+        InitNode(fake_root_);
     }
 
     /**
@@ -158,9 +157,8 @@ public:
      * @param alloc instance of template type
      */
     explicit set(const Allocator& alloc) :
-    size_(0), root_(nullptr), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc){
-        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-        root_->__parent_ = root_;
+    size_(0), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)){
+        InitNode(fake_root_);
     }
 
     set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
@@ -180,13 +178,15 @@ public:
 
 
     set(const set &s, std::true_type) :
-    size_(0), root_(nullptr), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_) {
+    size_(0), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
+        InitNode(fake_root_);
         for (const auto &v: s)
             Add(v);
     }
 
     set(const set& s, std::false_type) :
-            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) { //add rootparent
+            size_(0), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) { //add rootparent
+        InitNode(fake_root_);
         for (const auto &v: s)
             Add(v);
     }
@@ -197,13 +197,13 @@ public:
      */
     set(set&& s) noexcept : set(std::move(s), kComparator_moves){}
 
-    set(set&& s, std::true_type) noexcept : size_(s.size_), root_(s.root_), comparator_(std::move(s.comparator_)), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)){
-        s.root_ = nullptr;
+    set(set&& s, std::true_type) noexcept : size_(s.size_), comparator_(std::move(s.comparator_)), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
+        s.fake_root_ = nullptr;
         s.size_ = 0;
     }
 
-    set(set&& s, std::false_type) : size_(s.size_), root_(s.root_), comparator_(s.comparator_), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)){
-        s.root_ = nullptr;
+    set(set&& s, std::false_type) noexcept : size_(s.size_), comparator_(s.comparator_), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
+        s.fake_root_ = nullptr;
         s.size_ = 0;
     }
 
@@ -217,6 +217,8 @@ public:
         comparator_ = s.comparator_;
         alloc_ = s.alloc_;
         node_alloc_ = s.node_alloc_;
+        fake_root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+        InitNode(fake_root_);
         for (const auto &v: s)
             Add(v);
         return *this;
@@ -227,7 +229,7 @@ public:
             return *this;
         clear();
         size_ = s.size_;
-        root_ = s.root_;
+        fake_root_ = s.fake_root_;
         if constexpr(kComparator_moves){
             comparator_ = std::move(s.comparator_);
         }else{
@@ -236,7 +238,7 @@ public:
         alloc_ = std::move(s.alloc_);
         node_alloc_ = std::move(s.node_alloc_);
         s.size_ = 0;
-        s.root_ = nullptr;
+        s.fake_root_ = nullptr;
         return *this;
     }
 
@@ -259,7 +261,7 @@ public:
             DestructAndDeallocate(target);
             return std::make_pair(it, false);
         } else{
-            root_ = Insert(root_, target);
+            fake_root_->__left_ = Insert(fake_root_->__left_, target);
             ++size_;
             return std::make_pair(find(target->__key_), true);
         }
@@ -274,7 +276,7 @@ public:
             return std::make_pair(it, false);
         } else {
             Node * target = AllocateAndConstruct(value);
-            root_ = Insert(root_, target);
+            fake_root_->__left_ = Insert(fake_root_->__left_, target);
             ++size_;
             return std::make_pair(find(value), true);
         }
@@ -289,7 +291,7 @@ public:
             return std::make_pair(it, false);
         } else {
             Node * target = AllocateAndConstruct(std::move(value));
-            root_ = Insert(root_, target);
+            fake_root_->__left_ = Insert(fake_root_->__left_, target);
             ++size_;
             return std::make_pair(find(value), true);
         }
@@ -319,7 +321,8 @@ public:
      */
     void erase(reference value) {
         if (contains(value)){
-            root_ = Delete(root_, value);
+            fake_root_->__left_ = Delete(fake_root_->__left_, value);
+            fake_root_->__left_->__parent_ = fake_root_;
             --size_;
         }
     }
@@ -343,13 +346,13 @@ public:
     }
 
     bool contains(reference value) const noexcept{
-        return Search(value);
+        return iterator(Search(value)) != end();
     }
     /**
      * @brief Returns an iterator pointing to the first element that is not less than key
      */
     iterator lower_bound(const key_type& key) const noexcept{
-        Node* tmp = root_;
+        Node* tmp = fake_root_->__left_;
         Node* result = nullptr;
         while (tmp){
             if (!SafeCompare(tmp->__key_, key)){
@@ -366,7 +369,7 @@ public:
      * @brief Returns an iterator pointing to the first element that is greater than key
      */
     iterator upper_bound(const key_type& key) const noexcept {
-        Node* tmp = root_;
+        Node* tmp = fake_root_->__left_;
         Node* result = nullptr;
         while (tmp){
             if (SafeCompare(key, tmp->__key_)){
@@ -384,7 +387,7 @@ public:
      * @brief swaps contents of two sets
      */
     void swap(set &other) {
-        std::swap(root_, other.root_);
+        std::swap(fake_root_, other.fake_root_);
         std::swap(size_, other.size_);
         std::swap(comparator_, other.comparator_);
         std::swap(alloc_, other.alloc_);
@@ -400,47 +403,41 @@ public:
             if(one_step_behind != other.end() && !contains(*one_step_behind)){
                 auto root_and_extract = other.Extract(other.root_, *one_step_behind);
                 other.root_ = root_and_extract.first;
-                root_and_extract.second->__left_ = nullptr;
-                root_and_extract.second->__right_ = nullptr;
-                root_and_extract.second->__parent_ = nullptr;
-                root_and_extract.second->__height_ = 1;
-                root_ = Insert(root_, root_and_extract.second);
+                InitNode(root_and_extract.second);
+                fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
             }
             one_step_behind = it;
         }
         if(one_step_behind != other.end() && !contains(*one_step_behind)){
             auto root_and_extract = other.Extract(other.root_, *one_step_behind);
             other.root_ = root_and_extract.first;
-            root_and_extract.second->__left_ = nullptr;
-            root_and_extract.second->__right_ = nullptr;
-            root_and_extract.second->__parent_ = nullptr;
-            root_and_extract.second->__height_ = 1;
-            root_ = Insert(root_, root_and_extract.second);
+            InitNode(root_and_extract.second);
+            fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
         }
     }
 
     iterator begin() {
-        return iterator(FindLeftmost(root_));
+        return iterator(FindLeftmost(fake_root_->__left_));
     }
 
     iterator end() {
-        return iterator(root_->__parent_);
+        return iterator(fake_root_);
     }
 
     const_iterator begin() const {
-        return const_iterator(FindLeftmost(root_));
+        return const_iterator(FindLeftmost(fake_root_->__left_));
     }
 
     const_iterator end() const{
-        return const_iterator(root_->__parent_);
+        return const_iterator(fake_root_);
     }
 
     const_iterator cbegin() const{
-        return const_iterator(FindLeftmost(root_));
+        return const_iterator(FindLeftmost(fake_root_->__left_));
     }
 
     const_iterator cend() const{
-        return const_iterator(root_->__parent_);
+        return const_iterator(fake_root_);
     }
 
     bool empty() const noexcept{
@@ -452,21 +449,21 @@ public:
     }
 
     void clear() {
-        if (root_){
-            std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, root_->__parent_, 1);
-            root_->__parent_ = nullptr;
-            if(root_)
-                ClearNodes(root_);
-            root_ = nullptr;
+        if(fake_root_) {
+            if (fake_root_->__left_) {
+                ClearNodes(fake_root_->__left_);
+            }
+            std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
+            fake_root_ = nullptr;
+            size_ = 0;
         }
-        size_ = 0;
     }
     template <typename U = key_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
-    key_compare key_comp() const {
+    constexpr key_compare key_comp() const {
         return comparator_;
     }
     template <typename U = value_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
-    key_compare value_comp() const {
+    constexpr key_compare value_comp() const {
         return comparator_;
     }
 
@@ -524,10 +521,7 @@ protected:
     Node* AllocateAndConstruct(Args&&... args){
         try {
             Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-            target->__left_ = nullptr;
-            target->__right_ = nullptr;
-            target->__parent_ = nullptr;
-            target->__height_ = 1;
+            InitNode(target);
             std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), std::forward<Args>(args)...);
             return target;
         } catch (...){
@@ -563,8 +557,7 @@ protected:
      * @brief preforms binary search for Node of value
      */
     Node *Search(reference &value) const noexcept {
-        if(root_ == root_->__parent_) return root_->__parent_;
-        Node *tmp = root_;
+        Node *tmp = fake_root_->__left_;
         while (tmp) {
             if (SafeCompare(value, tmp->__key_)) {
                 tmp = tmp->__left_;
@@ -574,7 +567,7 @@ protected:
                 return tmp;
             }
         }
-        return tmp ? tmp : root_->__parent_;
+        return fake_root_;
     }
     /**
      * @brief check for node, create node, insert node.
@@ -591,7 +584,7 @@ protected:
      */
     void Add(value_type& value){
         Node* target = AllocateAndConstruct(value);
-        root_ = Insert(root_, target);
+        fake_root_->__left_ = Insert(fake_root_->__left_, target);
         ++size_;
     }
     /**
@@ -601,7 +594,7 @@ protected:
     void EmplaceAppend(Args&&... args){
         Node * target = AllocateAndConstruct(std::forward<Args>(args)...);
         if(!contains(target->__key_)){
-            root_ = Insert(root_, target);
+            fake_root_->__left_ = Insert(fake_root_->__left_, target);
             ++size_;
         }else{
             DestructAndDeallocate(target);
@@ -612,11 +605,9 @@ protected:
     * If node already exist will do nothing but attempting few rebalances; Prefereably find first;
     */
     Node *Insert(Node *root, Node *target) {
-        if(root == root_->__parent_) {
-            //first node
-            target->__parent_ = root_->__parent_;
-            return target;
-        }if(!root){
+        if(!root){
+            //if its first node
+            if(!fake_root_->__left_) target->__parent_ = fake_root_;
             //if node is a leaf
             return target;
         }
@@ -792,6 +783,17 @@ protected:
         return Balance(root);
     }
 
+    /**
+     * @brief essentially a crutch to avoid 9000 static casts from node noT to node T in code
+     * static casts are still probably preferable
+     */
+    void InitNode(Node* root) noexcept{
+        root->__left_ = nullptr;
+        root->__right_ = nullptr;
+        root->__parent_ = nullptr;
+        root->__height_ = 1;
+    }
+
 
 private:
     static constexpr const std::conditional_t<
@@ -800,14 +802,13 @@ private:
             std::false_type
     > kComparator_moves{};
     size_type size_;
-    Node * root_;
     /**
      * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
      */
     Compare comparator_;
     allocator_type alloc_;
     allocator_type_node node_alloc_;
-
+    Node * fake_root_;
 
 };
 
