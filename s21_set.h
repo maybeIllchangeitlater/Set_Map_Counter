@@ -9,7 +9,6 @@
 #include <iostream> //delete later
 #include <type_traits>
 #include "TreeAllocator.h"
-#include "decorator.h"
 
 //template<typename T>
 //class SetIterator;
@@ -401,16 +400,18 @@ public:
         auto one_step_behind = other.end();
         for(auto it = other.begin(); it != other.end(); ++it){
             if(one_step_behind != other.end() && !contains(*one_step_behind)){
-                auto root_and_extract = other.Extract(other.root_, *one_step_behind);
-                other.root_ = root_and_extract.first;
+                auto root_and_extract = other.Extract(other.fake_root_->__left_, *one_step_behind);
+                other.fake_root_->__left_ = root_and_extract.first;
+                other.fake_root_->__left_->__parent_ = other.fake_root_;
                 InitNode(root_and_extract.second);
                 fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
             }
             one_step_behind = it;
         }
         if(one_step_behind != other.end() && !contains(*one_step_behind)){
-            auto root_and_extract = other.Extract(other.root_, *one_step_behind);
-            other.root_ = root_and_extract.first;
+            auto root_and_extract = other.Extract(other.fake_root_->__left_, *one_step_behind);
+            other.fake_root_->__left_ = root_and_extract.first;
+            other.fake_root_->__left_->__parent_ = other.fake_root_;
             InitNode(root_and_extract.second);
             fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
         }
