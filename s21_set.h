@@ -243,7 +243,7 @@ public:
 
     ~set(){
         clear();
-    };
+    }
     /**
      * @brief  Inserts a new element into the container constructed in-place with the given args if there is no element with the key in the container.\n
      * Careful use of emplace allows the new element to be constructed while avoiding unnecessary copy or move operations. The constructor \n
@@ -294,7 +294,7 @@ public:
             ++size_;
             return std::make_pair(find(value), true);
         }
-    };
+    }
     /**
      * @brief insert elements in range of iterator first to iterator second into a tree
      */
@@ -619,6 +619,7 @@ protected:
             root->__right_ = Insert(root->__right_, target);
             root->__right_->__parent_ = root;
         } else {
+            //already exists
             return root;
         }
         return Balance(root);
@@ -815,7 +816,7 @@ private:
 
 };
 
-};
+} //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
 
 

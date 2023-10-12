@@ -41,10 +41,10 @@ namespace s21 {
 
         MyTreeAllocator& operator=(const MyTreeAllocator&) noexcept {
             return *this;
-        };
+        }
 
         MyTreeAllocator(MyTreeAllocator&&) noexcept : MyTreeAllocator() {
-        };
+        }
 
         MyTreeAllocator& operator=(MyTreeAllocator&&) noexcept {
             return *this;
@@ -65,10 +65,10 @@ namespace s21 {
         }
         template<typename U>
         MyTreeAllocator(MyTreeAllocator<U>&&) noexcept : MyTreeAllocator(){
-        };
+        }
         template<typename U>
         MyTreeAllocator& operator=(MyTreeAllocator<U>&&) noexcept{
-        };
+        }
 
         /**
          * @brief all memory allocated during trees lifecycles gets yeeted here
