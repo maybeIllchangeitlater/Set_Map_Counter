@@ -676,7 +676,7 @@ namespace s21{
         /**
          * @brief extracts Node from the tree, unlinking it but not deleting it
          */
-        std::pair<Node*, Node*> Extract(Node* root, key_type& value, Node* res = nullptr){
+        std::pair<Node*, Node*> Extract(Node* root, const key_type& value, Node* res = nullptr){
             if (SafeCompare(value, root->__key_)) {
                 auto extract = Extract(root->__left_, value, res);
                 root->__left_ = extract.first;

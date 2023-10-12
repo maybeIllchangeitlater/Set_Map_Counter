@@ -1,3 +1,4 @@
+CXX = g++
 FLAGS = -std=c++17 -Wall -Werror -Wextra
 SANITIZE = -fsanitize=address -pedantic 
 TARGETS = smc_tests/test_set.cc smc_tests/test_set_constructors.cc smc_tests/s21_matrix_oop.cc 

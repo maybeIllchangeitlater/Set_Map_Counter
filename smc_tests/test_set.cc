@@ -346,6 +346,46 @@ TEST_F(SetTestFrozen, erase_contains){
 
 }
 
+TEST_F(SetTest, merge){
+    set_string_stdalloc.insert({"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"});
+    s21::set<std::string, std::less<>, std::allocator<std::string>> b{"a", "aa", "aaa", "b", "bb", "bbb", "c", "cc", "ccc"};
+
+    std::set<std::string> s_from{"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"};
+    std::set<std::string>s_to{"a", "aa", "aaa", "b", "bb", "bbb", "c", "cc", "ccc"};
+
+    s21::set<int> i_from{1,3,5,7,9,13,15};
+    s21::set<int> i_to{1,2,3,4,5,6,7};
+
+    std::set<int> i_fromstd{1,3,5,7,9,13,15};
+    std::set<int> i_tostd{1,2,3,4,5,6,7};
+
+
+    b.merge(set_string_stdalloc);
+    s_to.merge(s_from);
+
+    i_to.merge(i_from);
+    i_tostd.merge(i_fromstd);
+
+    auto it1 = b.begin();
+    auto it2 = set_string_stdalloc.begin();
+    auto it3 = i_from.begin();
+    auto it4 = i_to.begin();
+    for(const auto& v: s_to){
+        ASSERT_EQ(*it1++, v);
+    }
+    for(const auto& v: s_from){
+        ASSERT_EQ(*it2++, v);
+    }
+    for(const auto& v: i_fromstd){
+        ASSERT_EQ(*it3++, v);
+    }
+    for(const auto& v: i_tostd){
+        ASSERT_EQ(*it4++, v);
+    }
+
+
+}
+
 TEST_F(SetTestFrozen, upper_bound){
 
     ASSERT_EQ(*set_matrix_myalloc.upper_bound(S21::S21Matrix(4,4)), *std::upper_bound(set_matrix_myalloc.begin(), set_matrix_myalloc.end(), S21::S21Matrix(4,4)));
@@ -376,6 +416,18 @@ TEST_F(SetTestFrozen, find){
     ASSERT_EQ(set_nodef_stdalloc.find(s21::NoDefaultDummyT(1)), set_nodef_stdalloc.begin());
 
 }
+
+TEST_F(SetTestFrozen, swap){
+    auto m_cpy(set_matrix_myalloc);
+    s21::set<S21::S21Matrix> matrix2{S21::S21Matrix()};
+    auto m2_cpy(matrix2);
+
+    set_matrix_myalloc.swap(matrix2);
+
+    ASSERT_EQ(m_cpy, matrix2);
+    ASSERT_EQ(m2_cpy, set_matrix_myalloc);
+}
+
 
 
 //set_matrix_myalloc.insert({S21::S21Matrix(1,1), S21::S21Matrix(2,2), S21::S21Matrix(3,3), S21::S21Matrix(15,15)});
