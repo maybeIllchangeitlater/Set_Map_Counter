@@ -513,7 +513,9 @@ protected:
          try{
              return comparator_(lhs, rhs);
          }catch(...){
-             const_cast<set<T, Compare, Allocator>*>(this)->clear();
+
+//             const_cast<set<T, Compare, Allocator>*>(this)->clear();
+            delete this;
              throw;
          }
      } //const cast is necessitated by const objects using comparator for find, etc. Alternative is delete this
