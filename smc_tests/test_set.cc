@@ -26,6 +26,41 @@ protected:
 
 };
 
+class SetTestFrozen :  public ::testing::Test {
+protected:
+
+    void SetUp() override{
+        set_matrix_myalloc.insert({S21::S21Matrix(1,1), S21::S21Matrix(2,2), S21::S21Matrix(3,3), S21::S21Matrix(15,15)});
+        set_string_stdalloc.insert({"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"});
+        set_vector_myalloc.insert({std::vector<int>{1, 2, 3}, std::vector<int>{1, 2, 3, 4, 5}, std::vector<int>{5, -5}});
+        set_nodef_stdalloc.insert({s21::NoDefaultDummyT(1), s21::NoDefaultDummyT(2), s21::NoDefaultDummyT(3), s21::NoDefaultDummyT(33)});
+        set_nomove_stdalloc.insert(
+                {s21::NoMoveDummyT(1), s21::NoMoveDummyT(2), s21::NoMoveDummyT(3), s21::NoMoveDummyT(33)});
+        set_nocopy_myalloc.emplace(3);
+        set_nocopy_myalloc.emplace(2);
+        set_nocopy_myalloc.emplace(33);
+        set_nocopy_myalloc.emplace(1);
+
+    }
+
+    void TearDown() override {
+        set_matrix_myalloc.clear();
+        set_nocopy_myalloc.clear();
+        set_vector_myalloc.clear();
+        set_string_stdalloc.clear();
+        set_nodef_stdalloc.clear();
+        set_nomove_stdalloc.clear();
+    }
+
+    s21::set<S21::S21Matrix> set_matrix_myalloc;
+    s21::set<s21::NoCopyDummyT> set_nocopy_myalloc;
+    s21::set<std::vector<int>> set_vector_myalloc;
+    s21::set<std::string, std::less<>, std::allocator<std::string>> set_string_stdalloc;
+    s21::set<s21::NoDefaultDummyT, s21::MyComparator<s21::NoDefaultDummyT>, std::allocator<s21::NoDefaultDummyT>> set_nodef_stdalloc;
+    s21::set<s21::NoMoveDummyT, std::less<s21::NoMoveDummyT>, std::allocator<s21::NoMoveDummyT>> set_nomove_stdalloc;
+
+};
+
 TEST_F(SetTest, insert_lvalue){
 
     S21::S21Matrix ins_m1(3,3);
@@ -272,10 +307,75 @@ TEST_F(SetTest, emplace){
 
 }
 
-//TEST_F(SetTest, erase){
-//
-//}
-//
+TEST_F(SetTestFrozen, erase_contains){
+
+    ASSERT_TRUE(set_string_stdalloc.contains("ac"));
+    set_string_stdalloc.erase("ac");
+    ASSERT_TRUE(!set_string_stdalloc.contains("ac"));
+    set_string_stdalloc.erase(--set_string_stdalloc.end());
+    ASSERT_TRUE(!set_string_stdalloc.contains("cc"));
+
+    ASSERT_TRUE(set_matrix_myalloc.contains(S21::S21Matrix(1,1)));
+    set_matrix_myalloc.erase(S21::S21Matrix(1,1));
+    ASSERT_TRUE(!set_matrix_myalloc.contains(S21::S21Matrix(1,1)));
+    set_matrix_myalloc.erase(--set_matrix_myalloc.end());
+
+    ASSERT_TRUE(set_vector_myalloc.contains(std::vector<int>{1,2,3,4,5}));
+    set_vector_myalloc.erase(std::vector<int>{1,2,3,4,5});
+    ASSERT_TRUE(!set_vector_myalloc.contains(std::vector<int>{1,2,3,4,5}));
+    set_vector_myalloc.erase(set_vector_myalloc.begin());
+    ASSERT_TRUE(!set_vector_myalloc.contains(std::vector<int>{1,2,3}));
+
+    ASSERT_TRUE(set_nodef_stdalloc.contains(s21::NoDefaultDummyT(1)));
+    set_nodef_stdalloc.erase(s21::NoDefaultDummyT(1));
+    ASSERT_TRUE(!set_nodef_stdalloc.contains(s21::NoDefaultDummyT(1)));
+    set_nodef_stdalloc.erase(--set_nodef_stdalloc.end());
+    ASSERT_TRUE(!set_nodef_stdalloc.contains(s21::NoDefaultDummyT(33)));
+
+    ASSERT_TRUE(set_nocopy_myalloc.contains(s21::NoCopyDummyT(1)));
+    set_nocopy_myalloc.erase(s21::NoCopyDummyT(1));
+    ASSERT_TRUE(!set_nocopy_myalloc.contains(s21::NoCopyDummyT(1)));
+    set_nocopy_myalloc.erase(--set_nocopy_myalloc.end());
+    ASSERT_TRUE(!set_nocopy_myalloc.contains(s21::NoCopyDummyT(33)));
+
+    ASSERT_TRUE(set_nomove_stdalloc.contains(s21::NoMoveDummyT(1)));
+    set_nomove_stdalloc.erase(s21::NoMoveDummyT(1));
+    ASSERT_TRUE(!set_nomove_stdalloc.contains(s21::NoMoveDummyT(1)));
+    set_nomove_stdalloc.erase(--set_nomove_stdalloc.end());
+    ASSERT_TRUE(!set_nomove_stdalloc.contains(s21::NoMoveDummyT(33)));
+
+}
+
+TEST_F(SetTestFrozen, upper_bound){
+
+    ASSERT_EQ(*set_matrix_myalloc.upper_bound(S21::S21Matrix(4,4)), *std::upper_bound(set_matrix_myalloc.begin(), set_matrix_myalloc.end(), S21::S21Matrix(4,4)));
+    ASSERT_EQ(*set_string_stdalloc.upper_bound("aaa"), *std::upper_bound(set_string_stdalloc.begin(), set_string_stdalloc.end(), "aaa"));
+    ASSERT_EQ(*set_vector_myalloc.upper_bound(std::vector<int>{4}), *std::upper_bound(set_vector_myalloc.begin(), set_vector_myalloc.end(), std::vector<int>{4}));
+    ASSERT_EQ(set_nodef_stdalloc.upper_bound(s21::NoDefaultDummyT(15))->x, std::upper_bound(set_nomove_stdalloc.begin(), set_nomove_stdalloc.end(), s21::NoMoveDummyT(15))->x);
+    ASSERT_EQ(set_nocopy_myalloc.upper_bound(s21::NoCopyDummyT(15))->x, 33);
+
+}
+
+TEST_F(SetTestFrozen, lower_bound){
+
+    ASSERT_EQ(*set_matrix_myalloc.lower_bound(S21::S21Matrix(4,4)), *std::lower_bound(set_matrix_myalloc.begin(), set_matrix_myalloc.end(), S21::S21Matrix(4,4)));
+    ASSERT_EQ(*set_string_stdalloc.lower_bound("aaa"), *std::lower_bound(set_string_stdalloc.begin(), set_string_stdalloc.end(), "aaa"));
+    ASSERT_EQ(*set_vector_myalloc.lower_bound(std::vector<int>{4}), *std::lower_bound(set_vector_myalloc.begin(), set_vector_myalloc.end(), std::vector<int>{4}));
+    ASSERT_EQ(set_nodef_stdalloc.lower_bound(s21::NoDefaultDummyT(15))->x, std::lower_bound(set_nomove_stdalloc.begin(), set_nomove_stdalloc.end(), s21::NoMoveDummyT(15))->x);
+    ASSERT_EQ(set_nocopy_myalloc.lower_bound(s21::NoCopyDummyT(15))->x, 33);
+
+}
+//set_matrix_myalloc.insert({S21::S21Matrix(1,1), S21::S21Matrix(2,2), S21::S21Matrix(3,3), S21::S21Matrix(15,15)});
+//set_string_stdalloc.insert({"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"});
+//set_vector_myalloc.insert({std::vector<int>{1, 2, 3}, std::vector<int>{1, 2, 3, 4, 5}, std::vector<int>{5, -5}});
+//set_nodef_stdalloc.insert({s21::NoDefaultDummyT(1), s21::NoDefaultDummyT(2), s21::NoDefaultDummyT(3), s21::NoDefaultDummyT(33)});
+//set_nomove_stdalloc.insert(
+//{s21::NoMoveDummyT(1), s21::NoMoveDummyT(2), s21::NoMoveDummyT(3), s21::NoMoveDummyT(33)});
+//set_nocopy_myalloc.emplace(3);
+//set_nocopy_myalloc.emplace(2);
+//set_nocopy_myalloc.emplace(33);
+//set_nocopy_myalloc.emplace(1);
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

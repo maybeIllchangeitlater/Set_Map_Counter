@@ -60,8 +60,8 @@ namespace s21 {
 
         template <typename U>
         MyTreeAllocator& operator=(const MyTreeAllocator<U>&) noexcept {
-//            ++ref_count_;
-//            return *this;
+//            ++ref_count_; maybe maybe not needs testings
+            return *this;
         }
         template<typename U>
         MyTreeAllocator(MyTreeAllocator<U>&&) noexcept : MyTreeAllocator(){

@@ -687,6 +687,8 @@ protected:
                 return std::make_pair(left, root);
             }
             Node *new_root = FindLeftmost(right);
+            if(new_root->__right_) new_root->__right_->__parent_ = new_root->__parent_;
+            if(new_root->__left_) new_root->__left_->__parent_ = new_root->__parent_;
             new_root->__parent_ = nullptr;
             new_root->__right_ = RebalanceFromLeft(right);
             if (new_root->__right_) new_root->__right_->__parent_ = new_root;
