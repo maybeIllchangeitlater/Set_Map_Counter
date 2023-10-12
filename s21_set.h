@@ -130,7 +130,10 @@ public:
     using const_iterator = SetIterator;
 
 
-    set() : size_(0), root_(nullptr), comparator_(Compare()), alloc_(), node_alloc_(alloc_) {}
+    set() : size_(0), root_(nullptr), comparator_(Compare()), alloc_(), node_alloc_(alloc_) {
+        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+        root_->__parent_ = root_;
+    }
 
     /**
      * @brief Wont compile if alloc type and template alloc are different or if comparator is not copy
@@ -142,7 +145,10 @@ public:
      * @param alloc instance of template type or default constructed template alloc by default
      */
     explicit set(const Compare& comp, const Allocator& alloc = Allocator()):  size_(0),
-    root_(nullptr), comparator_(comp), alloc_(alloc), node_alloc_(alloc){}
+    root_(nullptr), comparator_(comp), alloc_(alloc), node_alloc_(alloc){
+        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+        root_->__parent_ = root_;
+    }
 
     /**
      * @brief Wont compile if alloc type and template alloc are different
@@ -152,7 +158,10 @@ public:
      * @param alloc instance of template type
      */
     explicit set(const Allocator& alloc) :
-    size_(0), root_(nullptr), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc){}
+    size_(0), root_(nullptr), comparator_(Compare()), alloc_(alloc), node_alloc_(alloc){
+        root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+        root_->__parent_ = root_;
+    }
 
     set(std::initializer_list<value_type> init, const Compare& comp = Compare(), const Allocator& alloc = Allocator()) :
     set(comp, alloc){
@@ -177,7 +186,7 @@ public:
     }
 
     set(const set& s, std::false_type) :
-            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) {
+            size_(0), root_(nullptr), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_) { //add rootparent
         for (const auto &v: s)
             Add(v);
     }
@@ -415,7 +424,7 @@ public:
     }
 
     iterator end() {
-        return iterator(nullptr);
+        return iterator(root_->__parent_);
     }
 
     const_iterator begin() const {
@@ -423,7 +432,7 @@ public:
     }
 
     const_iterator end() const{
-        return const_iterator(nullptr);
+        return const_iterator(root_->__parent_);
     }
 
     const_iterator cbegin() const{
@@ -431,7 +440,7 @@ public:
     }
 
     const_iterator cend() const{
-        return const_iterator(nullptr);
+        return const_iterator(root_->__parent_);
     }
 
     bool empty() const noexcept{
@@ -444,7 +453,10 @@ public:
 
     void clear() {
         if (root_){
-            ClearNodes(root_);
+            std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, root_->__parent_, 1);
+            root_->__parent_ = nullptr;
+            if(root_)
+                ClearNodes(root_);
             root_ = nullptr;
         }
         size_ = 0;
@@ -551,6 +563,7 @@ protected:
      * @brief preforms binary search for Node of value
      */
     Node *Search(reference &value) const noexcept {
+        if(root_ == root_->__parent_) return root_->__parent_;
         Node *tmp = root_;
         while (tmp) {
             if (SafeCompare(value, tmp->__key_)) {
@@ -561,7 +574,7 @@ protected:
                 return tmp;
             }
         }
-        return tmp;
+        return tmp ? tmp : root_->__parent_;
     }
     /**
      * @brief check for node, create node, insert node.
@@ -599,7 +612,12 @@ protected:
     * If node already exist will do nothing but attempting few rebalances; Prefereably find first;
     */
     Node *Insert(Node *root, Node *target) {
-        if(!root) {
+        if(root == root_->__parent_) {
+            //first node
+            target->__parent_ = root_->__parent_;
+            return target;
+        }if(!root){
+            //if node is a leaf
             return target;
         }
         if (SafeCompare(target->__key_, root->__key_)) {
