@@ -365,6 +365,18 @@ TEST_F(SetTestFrozen, lower_bound){
     ASSERT_EQ(set_nocopy_myalloc.lower_bound(s21::NoCopyDummyT(15))->x, 33);
 
 }
+
+TEST_F(SetTestFrozen, find){
+
+    ASSERT_EQ(set_matrix_myalloc.find(S21::S21Matrix(1,1)), set_matrix_myalloc.begin());
+    ASSERT_EQ(--set_string_stdalloc.end(), set_string_stdalloc.find("cc"));
+    ASSERT_EQ(set_vector_myalloc.end(), set_vector_myalloc.find(std::vector<int>{123,123,123}));
+    ASSERT_EQ(set_nocopy_myalloc.find(s21::NoCopyDummyT(1)), set_nocopy_myalloc.begin());
+    ASSERT_EQ(set_nomove_stdalloc.find(s21::NoMoveDummyT(1)), set_nomove_stdalloc.begin());
+    ASSERT_EQ(set_nodef_stdalloc.find(s21::NoDefaultDummyT(1)), set_nodef_stdalloc.begin());
+
+}
+
 //set_matrix_myalloc.insert({S21::S21Matrix(1,1), S21::S21Matrix(2,2), S21::S21Matrix(3,3), S21::S21Matrix(15,15)});
 //set_string_stdalloc.insert({"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"});
 //set_vector_myalloc.insert({std::vector<int>{1, 2, 3}, std::vector<int>{1, 2, 3, 4, 5}, std::vector<int>{5, -5}});
