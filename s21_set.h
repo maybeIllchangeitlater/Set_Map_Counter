@@ -38,7 +38,7 @@ namespace s21{
 
         struct Node {
             value_type __key_;
-            size_t __height_;
+            size_type __height_;
             Node *__parent_;
             Node *__left_;
             Node *__right_;
@@ -51,8 +51,8 @@ namespace s21{
             using iterator = SetIterator;
             using iterator_category = std::bidirectional_iterator_tag;
             using difference_type = std::ptrdiff_t;
-            using reference = T &;
-            using pointer = T *;
+            using reference = const T &;
+            using pointer = const T *;
             using value_type = T;
             using const_reference = const T&;
             using const_pointer = const T*;
@@ -66,11 +66,11 @@ namespace s21{
             ~SetIterator() = default;
 
 
-            const_reference operator*() const {
+            reference operator*() const {
                 return n_->__key_;
             }
 
-            const_pointer operator->() const{
+            pointer operator->() const{
                 return &(n_->__key_);
             }
 
@@ -180,35 +180,12 @@ namespace s21{
         set(const set &s) : set(s, std::is_copy_constructible<Compare>()) {}
 
 
-        set(const set &s, std::true_type) :
-                size_(0), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
-            InitNode(fake_root_);
-            for (const auto &v: s)
-                Add(v);
-        }
-
-        set(const set& s, std::false_type) :
-                size_(0), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) { //add rootparent
-            InitNode(fake_root_);
-            for (const auto &v: s)
-                Add(v);
-        }
-
         /**
          * @brief Moves from set s.\n If comparator is nothrow movable or non-copy constructible will
          * copy
          */
         set(set&& s) noexcept : set(std::move(s), kComparator_moves){}
 
-        set(set&& s, std::true_type) noexcept : size_(s.size_), comparator_(std::move(s.comparator_)), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
-            s.fake_root_ = nullptr;
-            s.size_ = 0;
-        }
-
-        set(set&& s, std::false_type) noexcept : size_(s.size_), comparator_(s.comparator_), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
-            s.fake_root_ = nullptr;
-            s.size_ = 0;
-        }
 
         /**
          * @brief if comp or T has no copy constructor wont compile
@@ -290,7 +267,7 @@ namespace s21{
          * @brief insert element into a tree and returns iterator to it. If node already exists returns false and iterator
          * to existing node
          */
-        std::pair<iterator, bool> insert(T&& value){
+        std::pair<iterator, bool> insert(value_type && value){
             auto it = find(value);
             if (it != end()) {
                 return std::make_pair(it, false);
@@ -324,7 +301,7 @@ namespace s21{
         /**
          * @brief removes node from the tree. does nothing if it doesnt exist
          */
-        void erase(const_reference value) {
+        void erase(const key_type& value) {
             if (contains(value)){
                 fake_root_->__left_ = Delete(fake_root_->__left_, value);
                 fake_root_->__left_->__parent_ = fake_root_;
@@ -344,17 +321,19 @@ namespace s21{
 //        }
 //    }
         /**
-         * @brief returns iterator to position of node with input value or iterator to end
+         * @brief returns const iterator to position of node with input value or past-end iterator
          */
-        const_iterator find(const_reference &value) const noexcept {
+        const_iterator find(const key_type &value) const noexcept {
             return const_iterator(Search(value));
         }
-
-        iterator find(const_reference &value) noexcept {
+        /**
+         * @brief returns iterator to position of node with input value or or past-end iterator
+         */
+        iterator find(const key_type &value) noexcept {
             return iterator(Search(value));
         }
 
-        bool contains(const_reference value) const noexcept{
+        bool contains(const key_type &value) const noexcept{
             return const_iterator(Search(value)) != end();
         }
         /**
@@ -514,6 +493,30 @@ namespace s21{
         }
 
     protected:
+        set(const set &s, std::true_type) :
+                size_(0), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
+            InitNode(fake_root_);
+            for (const auto &v: s)
+                Add(v);
+        }
+
+        set(const set& s, std::false_type) :
+                size_(0), comparator_(Compare()), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) { //add rootparent
+            InitNode(fake_root_);
+            for (const auto &v: s)
+                Add(v);
+        }
+
+        set(set&& s, std::true_type) noexcept : size_(s.size_), comparator_(std::move(s.comparator_)), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
+            s.fake_root_ = nullptr;
+            s.size_ = 0;
+        }
+
+        set(set&& s, std::false_type) noexcept : size_(s.size_), comparator_(s.comparator_), alloc_(std::move(s.alloc_)), node_alloc_(std::move(s.alloc_)), fake_root_(std::move(s.fake_root_)){
+            s.fake_root_ = nullptr;
+            s.size_ = 0;
+        }
+
         /**
          * @brief noexcept is not required for comparator.
          * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
@@ -524,8 +527,7 @@ namespace s21{
                 return comparator_(lhs, rhs);
             }catch(...){
 
-//             const_cast<set<T, Compare, Allocator>*>(this)->clear();
-                delete this;
+                const_cast<set<T, Compare, Allocator>*>(this)->clear();
                 throw;
             }
         } //const cast is necessitated by const objects using comparator for find, etc. Alternative is delete this
@@ -569,7 +571,7 @@ namespace s21{
         /**
          * @brief preforms binary search for Node of value
          */
-        Node *Search(const_reference &value) const noexcept {
+        Node *Search(const key_type &value) const noexcept {
             Node *tmp = fake_root_->__left_;
             while (tmp) {
                 if (SafeCompare(value, tmp->__key_)) {
