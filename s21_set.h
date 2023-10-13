@@ -281,7 +281,7 @@ namespace s21{
         /**
          * @brief insert elements in range of iterator first to iterator second into a tree
          */
-        template<class InputIt>
+        template<typename InputIt>
         void insert(InputIt first, InputIt last){
             if constexpr (std::is_base_of_v<std::input_iterator_tag, typename std::iterator_traits<InputIt>::iterator_category>) {
                 for (InputIt it = first; it != last;++it){
