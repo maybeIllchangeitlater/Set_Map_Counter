@@ -23,6 +23,7 @@ namespace s21{
 
 
 
+
     template<typename T, typename Compare = MyComparator<T>, typename Allocator = MyTreeAllocator<T>>
     class set {
     public:
@@ -45,34 +46,45 @@ namespace s21{
         };
 
         using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
-
+        template< bool Const = false >
         class SetIterator  {
         public:
             using iterator = SetIterator;
             using iterator_category = std::bidirectional_iterator_tag;
             using difference_type = std::ptrdiff_t;
-            using reference = const T &;
-            using pointer = const T *;
+            using reference = typename std::conditional_t< Const, T const &, T & >;
+            using pointer = typename std::conditional_t< Const, T const *, T * >;
             using value_type = T;
-            using const_reference = const T&;
-            using const_pointer = const T*;
-
 
 
             SetIterator() = delete;
 
             explicit SetIterator(Node *n) : n_(n) {}
 
-            ~SetIterator() = default;
+            virtual ~SetIterator() = default;
 
 
+//            template< bool _Const = Const >
+//            std::enable_if_t< _Const, reference >
             reference operator*() const {
                 return n_->__key_;
             }
 
+//            template< bool _Const = Const, bool is_map = __is_map >
+//            std::enable_if_t< !_Const && is_map,  reference >
+//            operator*() {
+//                return n_->__key_;
+//            }
+
             pointer operator->() const{
                 return &(n_->__key_);
             }
+
+//            template< bool _Const = Const>
+//            std::enable_if_t< _Const, pointer >
+//            operator->() const{
+//                return &(n_->__key_);
+//            }
 
             /**
              * @brief Starting from leftmost node, check if right node exists. If it does, go to it's leftmost node
@@ -130,8 +142,8 @@ namespace s21{
             Node *n_;
         };
 
-        using iterator = SetIterator;
-        using const_iterator = SetIterator;
+        using iterator = SetIterator<true>;
+        using const_iterator = SetIterator<true>;
 
 
         set() : size_(0), comparator_(Compare()), alloc_(), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
@@ -224,7 +236,7 @@ namespace s21{
             return *this;
         }
 
-        ~set(){
+        virtual ~set(){
             clear();
         }
         /**
@@ -522,7 +534,7 @@ namespace s21{
          * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
          * rebalancing.
          */
-        bool SafeCompare(const value_type& lhs, const value_type& rhs) const{
+        virtual bool SafeCompare(const value_type& lhs, const value_type& rhs) const{
             try{
                 return comparator_(lhs, rhs);
             }catch(...){
@@ -813,7 +825,7 @@ namespace s21{
         }
 
 
-    private:
+    protected:
         static constexpr const std::conditional_t<
                 std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
                 std::true_type,
@@ -832,6 +844,3 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-
-
-///// Tests with throws, especially comp. Move and copy constructors. Add fakeroot and leftmost node for O(1) begin and end
