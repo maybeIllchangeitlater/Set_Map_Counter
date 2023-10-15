@@ -23,6 +23,7 @@ namespace s21{
 
 
 
+
     template<typename T, typename Compare = MyComparator<T>, typename Allocator = MyTreeAllocator<T>>
     class set {
     public:
@@ -45,34 +46,45 @@ namespace s21{
         };
 
         using allocator_type_node = typename std::allocator_traits<allocator_type>::template rebind_alloc<Node>;
-
+        template< bool Const = false >
         class SetIterator  {
         public:
             using iterator = SetIterator;
             using iterator_category = std::bidirectional_iterator_tag;
             using difference_type = std::ptrdiff_t;
-            using reference = const T &;
-            using pointer = const T *;
+            using reference = typename std::conditional_t< Const, T const &, T & >;
+            using pointer = typename std::conditional_t< Const, T const *, T * >;
             using value_type = T;
-            using const_reference = const T&;
-            using const_pointer = const T*;
-
 
 
             SetIterator() = delete;
 
             explicit SetIterator(Node *n) : n_(n) {}
 
-            ~SetIterator() = default;
+            virtual ~SetIterator() = default;
 
 
+//            template< bool _Const = Const >
+//            std::enable_if_t< _Const, reference >
             reference operator*() const {
                 return n_->__key_;
             }
 
+//            template< bool _Const = Const, bool is_map = __is_map >
+//            std::enable_if_t< !_Const && is_map,  reference >
+//            operator*() {
+//                return n_->__key_;
+//            }
+
             pointer operator->() const{
                 return &(n_->__key_);
             }
+
+//            template< bool _Const = Const>
+//            std::enable_if_t< _Const, pointer >
+//            operator->() const{
+//                return &(n_->__key_);
+//            }
 
             /**
              * @brief Starting from leftmost node, check if right node exists. If it does, go to it's leftmost node
@@ -130,8 +142,8 @@ namespace s21{
             Node *n_;
         };
 
-        using iterator = SetIterator;
-        using const_iterator = SetIterator;
+        using iterator = SetIterator<false>;
+        using const_iterator = SetIterator<false>;
 
 
         set() : size_(0), comparator_(Compare()), alloc_(), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
@@ -195,14 +207,6 @@ namespace s21{
                 return *this;
             set tmp(s);
             *this = std::move(tmp);
-//            clear();
-//            comparator_ = s.comparator_;
-//            alloc_ = s.alloc_;
-//            node_alloc_ = s.node_alloc_;
-//            fake_root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-//            InitNode(fake_root_);
-//            for (const auto &v: s)
-//                Add(v);
             return *this;
         }
 
@@ -210,6 +214,8 @@ namespace s21{
             if(this == &s)
                 return *this;
             clear();
+            if(fake_root_)
+                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
             size_ = s.size_;
             fake_root_ = s.fake_root_;
             if constexpr(kComparator_moves){
@@ -224,8 +230,12 @@ namespace s21{
             return *this;
         }
 
-        ~set(){
+        virtual ~set(){
             clear();
+            if(fake_root_) {
+                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
+                fake_root_ = nullptr;
+            }
         }
         /**
          * @brief  Inserts a new element into the container constructed in-place with the given args if there is no element with the key in the container.\n
@@ -314,12 +324,17 @@ namespace s21{
         void erase(iterator pos) {
             erase(*pos);
         }
-
-//    void erase(const_iterator first, const_iterator last){ //fix this one
-//        while(first != last){
-//            first = erase(first);
-//        }
-//    }
+        /**
+         * erase elements from first to last(not including).
+         * if first is after last behaviour is undefined
+         */
+        void erase(const_iterator first, const_iterator last){
+            while(first != last){
+                auto it = first;
+                ++first;
+                erase(it);
+            }
+        }
         /**
          * @brief returns const iterator to position of node with input value or past-end iterator
          */
@@ -343,7 +358,7 @@ namespace s21{
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (!SafeCompare(tmp->__key_, key)){
+                if (!WrappedCompare(tmp->__key_, key)){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -360,7 +375,7 @@ namespace s21{
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (SafeCompare(key, tmp->__key_)){
+                if (WrappedCompare(key, tmp->__key_)){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -443,8 +458,7 @@ namespace s21{
                 if (fake_root_->__left_) {
                     ClearNodes(fake_root_->__left_);
                 }
-                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
-                fake_root_ = nullptr;
+                fake_root_->__left_ = nullptr;
                 size_ = 0;
             }
         }
@@ -518,29 +532,21 @@ namespace s21{
         }
 
         /**
-         * @brief noexcept is not required for comparator.
-         * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
-         * rebalancing.
+         * @brief purely for inheritance. Can be changed with decorator but f me a
          */
-        bool SafeCompare(const value_type& lhs, const value_type& rhs) const{
-            try{
-                return comparator_(lhs, rhs);
-            }catch(...){
-
-                const_cast<set<T, Compare, Allocator>*>(this)->clear();
-                throw;
-            }
-        } //const cast is necessitated by const objects using comparator for find, etc. Alternative is delete this
+        virtual bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
+            return comparator_(lhs, rhs);
+        }
 
         template <typename... Args>
         Node* AllocateAndConstruct(Args&&... args){
+            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+            InitNode(target);
             try {
-                Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-                InitNode(target);
                 std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), std::forward<Args>(args)...);
                 return target;
             } catch (...){
-                clear();
+                DestructAndDeallocate(target);
                 throw;
             }
         }
@@ -571,12 +577,12 @@ namespace s21{
         /**
          * @brief preforms binary search for Node of value
          */
-        Node *Search(const key_type &value) const noexcept {
+         Node *Search(const key_type &value) const noexcept {
             Node *tmp = fake_root_->__left_;
             while (tmp) {
-                if (SafeCompare(value, tmp->__key_)) {
+                if (WrappedCompare(value, tmp->__key_)) {
                     tmp = tmp->__left_;
-                } else if (SafeCompare(tmp->__key_, value)) {
+                } else if (WrappedCompare(tmp->__key_, value)) {
                     tmp = tmp->__right_;
                 } else {
                     return tmp;
@@ -626,10 +632,10 @@ namespace s21{
                 //if node is a leaf
                 return target;
             }
-            if (SafeCompare(target->__key_, root->__key_)) {
+            if (WrappedCompare(target->__key_, root->__key_)) {
                 root->__left_ = Insert(root->__left_, target);
                 root->__left_->__parent_ = root;
-            } else if (SafeCompare(root->__key_, target->__key_)) {
+            } else if (WrappedCompare(root->__key_, target->__key_)) {
                 root->__right_ = Insert(root->__right_, target);
                 root->__right_->__parent_ = root;
             } else {
@@ -646,12 +652,12 @@ namespace s21{
         * (or you can change it to rightmost from left child, doesn't matter)
         */
         Node *Delete(Node *root, const key_type &value) {
-            if (SafeCompare(value, root->__key_)) {
+            if (WrappedCompare(value, root->__key_)) {
                 root->__left_ = Delete(root->__left_, value);
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (SafeCompare(root->__key_, value)) {
+            } else if (WrappedCompare(root->__key_, value)) {
                 root->__right_ = Delete(root->__right_, value);
                 if (root->__right_) {
                     root->__right_->__parent_ = root;
@@ -679,14 +685,14 @@ namespace s21{
          * @brief extracts Node from the tree, unlinking it but not deleting it
          */
         std::pair<Node*, Node*> Extract(Node* root, const key_type& value, Node* res = nullptr){
-            if (SafeCompare(value, root->__key_)) {
+            if (WrappedCompare(value, root->__key_)) {
                 auto extract = Extract(root->__left_, value, res);
                 root->__left_ = extract.first;
                 res = extract.second;
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (SafeCompare(root->__key_, value)) {
+            } else if (WrappedCompare(root->__key_, value)) {
                 auto extract = Extract(root->__right_, value, res);
                 root->__right_ = extract.first;
                 res = extract.second;
@@ -813,7 +819,7 @@ namespace s21{
         }
 
 
-    private:
+    protected:
         static constexpr const std::conditional_t<
                 std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
                 std::true_type,
@@ -832,6 +838,7 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-
-
-///// Tests with throws, especially comp. Move and copy constructors. Add fakeroot and leftmost node for O(1) begin and end
+///erase range tests and some tests for clear
+///input iterator insert test with not iteratorss
+///fix [] (prob write find overload for set)
+///tests for map
