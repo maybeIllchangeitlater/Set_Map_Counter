@@ -214,6 +214,8 @@ namespace s21{
             if(this == &s)
                 return *this;
             clear();
+            if(fake_root_)
+                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
             size_ = s.size_;
             fake_root_ = s.fake_root_;
             if constexpr(kComparator_moves){
@@ -230,6 +232,10 @@ namespace s21{
 
         virtual ~set(){
             clear();
+            if(fake_root_) {
+                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
+                fake_root_ = nullptr;
+            }
         }
         /**
          * @brief  Inserts a new element into the container constructed in-place with the given args if there is no element with the key in the container.\n
@@ -447,8 +453,7 @@ namespace s21{
                 if (fake_root_->__left_) {
                     ClearNodes(fake_root_->__left_);
                 }
-                std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
-                fake_root_ = nullptr;
+                fake_root_->__left_ = nullptr;
                 size_ = 0;
             }
         }
@@ -525,7 +530,7 @@ namespace s21{
          * @brief purely for inheritance. Can be changed with decorator but f me a
          */
         virtual bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
-                return comparator_(lhs, rhs);
+            return comparator_(lhs, rhs);
         }
 
         template <typename... Args>
@@ -828,3 +833,4 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
+///erase range and some tests for clear

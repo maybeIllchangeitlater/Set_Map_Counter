@@ -46,6 +46,35 @@ public:
 
     using Base::Base;
     using Base::insert;
+    map(map& m) : Base(m){}
+    map(map&&  m) : Base(std::move(m)){}
+    map &operator=(map& m){
+        if(this == &m)
+            return *this;
+        map tmp(m);
+        *this = std::move(tmp);
+        return *this;
+    }
+    map &operator=(map&& m){
+        if(this == &m)
+            return *this;
+        Base::clear();
+        if(Base::fake_root_)
+            std::allocator_traits<typename Base::allocator_type_node>::deallocate
+            (Base::node_alloc_, Base::fake_root_, 1);
+        Base::size_ = m.size_;
+        Base::fake_root_ = m.fake_root_;
+        if constexpr(Base::kComparator_moves){
+            Base::comparator_ = std::move(m.comparator_);
+        }else{
+            Base::comparator_ = m.comparator_;
+        }
+        Base::alloc_ = std::move(m.alloc_);
+        Base::node_alloc_ = std::move(m.node_alloc_);
+        m.size_ = 0;
+        m.fake_root_ = nullptr;
+        return *this;
+    }
     ~map() override = default;
 
     /**
