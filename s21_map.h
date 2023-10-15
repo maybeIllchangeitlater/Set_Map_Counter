@@ -47,6 +47,7 @@ public:
     using Base::Base;
     using Base::insert;
     using Base::find;
+    using Base::erase;
 
     map(const map& m) : Base(m){}
 
@@ -93,6 +94,15 @@ public:
         auto it = find(*crutchify);
         ::operator delete(crutchify);
         return it;
+     }
+     /**
+      * @brief erases element with Key key. If element doesn't exist does nothing
+      */
+     void erase(const key_type& key){
+         auto* crutchify = static_cast<std::pair<key_type, mapped_type>*>(::operator new(sizeof(std::pair<key_type, mapped_type>)));
+         crutchify->first = key;
+         erase(*crutchify);
+         ::operator delete(crutchify);
      }
 
     /**

@@ -255,7 +255,7 @@ namespace s21{
             } else{
                 fake_root_->__left_ = Insert(fake_root_->__left_, target);
                 ++size_;
-                return std::make_pair(find(target->__key_), true);
+                return std::make_pair(iterator(target), true);
             }
         }
         /**
@@ -270,7 +270,7 @@ namespace s21{
                 Node * target = AllocateAndConstruct(value);
                 fake_root_->__left_ = Insert(fake_root_->__left_, target);
                 ++size_;
-                return std::make_pair(find(value), true);
+                return std::make_pair(iterator(target), true);
             }
         }
         /**
@@ -285,7 +285,7 @@ namespace s21{
                 Node * target = AllocateAndConstruct(std::move(value));
                 fake_root_->__left_ = Insert(fake_root_->__left_, target);
                 ++size_;
-                return std::make_pair(find(value), true);
+                return std::make_pair(iterator(target), true);
             }
         }
         /**
@@ -312,11 +312,8 @@ namespace s21{
          * @brief removes node from the tree. does nothing if it doesnt exist
          */
         void erase(const key_type& value) {
-            if (contains(value)){
                 fake_root_->__left_ = Delete(fake_root_->__left_, value);
                 if(fake_root_->__left_)fake_root_->__left_->__parent_ = fake_root_;
-                --size_;
-            }
         }
         /**
          * @brief removes node from the tree. does nothing if it doesnt exist
@@ -409,6 +406,7 @@ namespace s21{
                     other.fake_root_->__left_->__parent_ = other.fake_root_;
                     InitNode(root_and_extract.second);
                     fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
+                    ++size_;
                 }
                 one_step_behind = it;
             }
@@ -418,6 +416,7 @@ namespace s21{
                 other.fake_root_->__left_->__parent_ = other.fake_root_;
                 InitNode(root_and_extract.second);
                 fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
+                ++size_;
             }
         }
 
@@ -462,11 +461,9 @@ namespace s21{
                 size_ = 0;
             }
         }
-        template <typename U = key_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
         constexpr key_compare key_comp() const {
             return comparator_;
         }
-        template <typename U = value_compare, typename = typename std::enable_if<std::is_copy_constructible<U>::value>::type>
         constexpr key_compare value_comp() const {
             return comparator_;
         }
@@ -618,7 +615,7 @@ namespace s21{
                 fake_root_->__left_ = Insert(fake_root_->__left_, target);
                 ++size_;
             }else{
-                DestructAndDeallocate(target);
+                 DestructAndDeallocate(target);
             }
         }
         /**
@@ -663,6 +660,7 @@ namespace s21{
                     root->__right_->__parent_ = root;
                 }
             } else {
+                --size_;
                 Node * left = root->__left_;
                 Node * right = root->__right_;
                 DestructAndDeallocate(root);
@@ -838,5 +836,4 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-///input iterator insert test with not iteratorss
 ///tests for map
