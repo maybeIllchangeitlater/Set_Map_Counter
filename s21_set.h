@@ -142,8 +142,8 @@ namespace s21{
             Node *n_;
         };
 
-        using iterator = SetIterator<true>;
-        using const_iterator = SetIterator<true>;
+        using iterator = SetIterator<false>;
+        using const_iterator = SetIterator<false>;
 
 
         set() : size_(0), comparator_(Compare()), alloc_(), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
@@ -207,14 +207,6 @@ namespace s21{
                 return *this;
             set tmp(s);
             *this = std::move(tmp);
-//            clear();
-//            comparator_ = s.comparator_;
-//            alloc_ = s.alloc_;
-//            node_alloc_ = s.node_alloc_;
-//            fake_root_ = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-//            InitNode(fake_root_);
-//            for (const auto &v: s)
-//                Add(v);
             return *this;
         }
 
@@ -355,7 +347,7 @@ namespace s21{
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (!SafeCompare(tmp->__key_, key)){
+                if (!WrappedCompare(tmp->__key_, key)){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -372,7 +364,7 @@ namespace s21{
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (SafeCompare(key, tmp->__key_)){
+                if (WrappedCompare(key, tmp->__key_)){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -530,29 +522,21 @@ namespace s21{
         }
 
         /**
-         * @brief noexcept is not required for comparator.
-         * Thankfully AVL balancing doesn't use comparator - we can't "lose" allocated nodes during
-         * rebalancing.
+         * @brief purely for inheritance. Can be changed with decorator but f me a
          */
-        virtual bool SafeCompare(const value_type& lhs, const value_type& rhs) const{
-            try{
+        virtual bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
                 return comparator_(lhs, rhs);
-            }catch(...){
-
-                const_cast<set<T, Compare, Allocator>*>(this)->clear();
-                throw;
-            }
-        } //const cast is necessitated by const objects using comparator for find, etc. Alternative is delete this
+        }
 
         template <typename... Args>
         Node* AllocateAndConstruct(Args&&... args){
+            Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
+            InitNode(target);
             try {
-                Node *target = std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1);
-                InitNode(target);
                 std::allocator_traits<allocator_type>::construct(alloc_, &(target->__key_), std::forward<Args>(args)...);
                 return target;
             } catch (...){
-                clear();
+                DestructAndDeallocate(target);
                 throw;
             }
         }
@@ -586,9 +570,9 @@ namespace s21{
         Node *Search(const key_type &value) const noexcept {
             Node *tmp = fake_root_->__left_;
             while (tmp) {
-                if (SafeCompare(value, tmp->__key_)) {
+                if (WrappedCompare(value, tmp->__key_)) {
                     tmp = tmp->__left_;
-                } else if (SafeCompare(tmp->__key_, value)) {
+                } else if (WrappedCompare(tmp->__key_, value)) {
                     tmp = tmp->__right_;
                 } else {
                     return tmp;
@@ -638,10 +622,10 @@ namespace s21{
                 //if node is a leaf
                 return target;
             }
-            if (SafeCompare(target->__key_, root->__key_)) {
+            if (WrappedCompare(target->__key_, root->__key_)) {
                 root->__left_ = Insert(root->__left_, target);
                 root->__left_->__parent_ = root;
-            } else if (SafeCompare(root->__key_, target->__key_)) {
+            } else if (WrappedCompare(root->__key_, target->__key_)) {
                 root->__right_ = Insert(root->__right_, target);
                 root->__right_->__parent_ = root;
             } else {
@@ -658,12 +642,12 @@ namespace s21{
         * (or you can change it to rightmost from left child, doesn't matter)
         */
         Node *Delete(Node *root, const key_type &value) {
-            if (SafeCompare(value, root->__key_)) {
+            if (WrappedCompare(value, root->__key_)) {
                 root->__left_ = Delete(root->__left_, value);
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (SafeCompare(root->__key_, value)) {
+            } else if (WrappedCompare(root->__key_, value)) {
                 root->__right_ = Delete(root->__right_, value);
                 if (root->__right_) {
                     root->__right_->__parent_ = root;
@@ -691,14 +675,14 @@ namespace s21{
          * @brief extracts Node from the tree, unlinking it but not deleting it
          */
         std::pair<Node*, Node*> Extract(Node* root, const key_type& value, Node* res = nullptr){
-            if (SafeCompare(value, root->__key_)) {
+            if (WrappedCompare(value, root->__key_)) {
                 auto extract = Extract(root->__left_, value, res);
                 root->__left_ = extract.first;
                 res = extract.second;
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (SafeCompare(root->__key_, value)) {
+            } else if (WrappedCompare(root->__key_, value)) {
                 auto extract = Extract(root->__right_, value, res);
                 root->__right_ = extract.first;
                 res = extract.second;
