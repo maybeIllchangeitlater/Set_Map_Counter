@@ -314,7 +314,7 @@ namespace s21{
         void erase(const key_type& value) {
             if (contains(value)){
                 fake_root_->__left_ = Delete(fake_root_->__left_, value);
-                fake_root_->__left_->__parent_ = fake_root_;
+                if(fake_root_->__left_)fake_root_->__left_->__parent_ = fake_root_;
                 --size_;
             }
         }
@@ -446,7 +446,7 @@ namespace s21{
         }
 
         bool empty() const noexcept{
-            return !size_;
+            return size_ == 0;
         }
 
         size_type size() const noexcept{
@@ -838,7 +838,5 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-///erase range tests and some tests for clear
 ///input iterator insert test with not iteratorss
-///fix [] (prob write find overload for set)
 ///tests for map

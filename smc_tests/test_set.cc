@@ -346,6 +346,15 @@ TEST_F(SetTestFrozen, erase_contains){
 
 }
 
+TEST_F(SetTestFrozen, erase_range){
+    set_matrix_myalloc.erase(set_matrix_myalloc.begin(), set_matrix_myalloc.end());
+    ASSERT_TRUE(set_matrix_myalloc.empty());
+
+    set_string_stdalloc.erase(set_string_stdalloc.begin(), --set_string_stdalloc.end());
+    ASSERT_STREQ((--set_string_stdalloc.end())->c_str(), "cc");
+
+}
+
 TEST_F(SetTest, merge){
     set_string_stdalloc.insert({"a", "aa", "ab", "ac", "ad", "b", "bb", "bc", "c", "cc"});
     s21::set<std::string, std::less<>, std::allocator<std::string>> b{"a", "aa", "aaa", "b", "bb", "bbb", "c", "cc", "ccc"};
@@ -388,36 +397,37 @@ TEST_F(SetTest, merge){
 
 TEST_F(SetTestFrozen, clear){
     set_matrix_myalloc.clear();
+    ASSERT_TRUE(set_matrix_myalloc.empty());
     set_matrix_myalloc.emplace(S21::S21Matrix());
-    ASSERT_EQ(set_matrix_myalloc.size(), 1);
     ASSERT_EQ(set_matrix_myalloc.begin()->GetRows(), 5);
 
     set_string_stdalloc.clear();
+    ASSERT_TRUE(set_string_stdalloc.empty());
     set_string_stdalloc.emplace("uWu");
-    ASSERT_EQ(set_string_stdalloc.size(), 1);
     ASSERT_STREQ(set_string_stdalloc.begin()->c_str(), "uWu");
 
     set_vector_myalloc.clear();
+    ASSERT_TRUE(set_vector_myalloc.empty());
     set_vector_myalloc.insert(std::vector<int>{1,1,1,1});
-    ASSERT_EQ(set_vector_myalloc.size(), 1);
     ASSERT_EQ(std::count(set_vector_myalloc.begin()->begin(), set_vector_myalloc.begin()->end(), 1), 4);
 
     set_nodef_stdalloc.clear();
+    ASSERT_TRUE(set_nodef_stdalloc.empty());
     set_nodef_stdalloc.emplace(123);
-    ASSERT_EQ(set_nodef_stdalloc.size(), 1);
     ASSERT_EQ(set_nodef_stdalloc.begin()->x, 123);
 
     set_nomove_stdalloc.clear();
+    ASSERT_TRUE(set_nomove_stdalloc.empty());
     set_nomove_stdalloc.emplace(123);
-    ASSERT_EQ(set_nomove_stdalloc.size(), 1);
     ASSERT_EQ(set_nomove_stdalloc.begin()->x, 123);
 
     set_nocopy_myalloc.clear();
+    ASSERT_TRUE(set_nocopy_myalloc.empty());
     set_nocopy_myalloc.emplace(123);
-    ASSERT_EQ(set_nocopy_myalloc.size(), 1);
     ASSERT_EQ(set_nocopy_myalloc.begin()->x, 123);
 
 }
+
 
 TEST_F(SetTestFrozen, upper_bound){
 
