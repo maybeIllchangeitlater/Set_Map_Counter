@@ -324,12 +324,17 @@ namespace s21{
         void erase(iterator pos) {
             erase(*pos);
         }
-
-//    void erase(const_iterator first, const_iterator last){ //fix this one
-//        while(first != last){
-//            first = erase(first);
-//        }
-//    }
+    /**
+     * erase elements from first to last(not including).
+     * if first is after last behaviour is undefined
+     */
+    void erase(const_iterator first, const_iterator last){
+        while(first != last){
+            auto it = first;
+            ++first;
+            erase(it);
+        }
+    }
         /**
          * @brief returns const iterator to position of node with input value or past-end iterator
          */
@@ -834,3 +839,5 @@ namespace s21{
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
 ///erase range and some tests for clear
+///input iterator insert test with not iteratorss
+///comparator return test

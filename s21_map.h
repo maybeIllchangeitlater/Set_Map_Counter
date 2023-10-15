@@ -46,16 +46,16 @@ public:
 
     using Base::Base;
     using Base::insert;
-    map(map& m) : Base(m){}
-    map(map&&  m) : Base(std::move(m)){}
-    map &operator=(map& m){
+    map(const map& m) : Base(m){}
+    map(map&&  m) noexcept : Base(std::move(m)){}
+    map &operator=(const map& m){
         if(this == &m)
             return *this;
         map tmp(m);
         *this = std::move(tmp);
         return *this;
     }
-    map &operator=(map&& m){
+    map &operator=(map&& m) noexcept {
         if(this == &m)
             return *this;
         Base::clear();
