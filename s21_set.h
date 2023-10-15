@@ -838,6 +838,7 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-///erase range and some tests for clear
+///erase range tests and some tests for clear
 ///input iterator insert test with not iteratorss
-///comparator return test
+///fix [] (prob write find overload for set)
+///tests for map
