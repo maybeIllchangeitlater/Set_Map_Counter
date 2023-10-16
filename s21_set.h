@@ -9,6 +9,7 @@
 #include <iostream> //delete later
 #include <type_traits>
 #include "TreeAllocator.h"
+//#include "s21_map.h"
 
 //template<typename T>
 //class SetIterator;
@@ -20,7 +21,6 @@ namespace s21{
         }
 
     }; //no real reason, just for fun.
-
 
 
 
@@ -36,6 +36,8 @@ namespace s21{
         using value_compare = key_compare;
         using const_reference = const T &;
         using size_type = size_t;
+        static_assert((std::is_same<typename allocator_type::value_type, value_type>::value),
+                      "Allocator value type must be the same as value type");
 
         struct Node {
             value_type __key_;
@@ -61,30 +63,29 @@ namespace s21{
 
             explicit SetIterator(Node *n) : n_(n) {}
 
-            virtual ~SetIterator() = default;
+            // Conversion operator for converting SetIterator<false> to SetIterator<true>
+            template <bool V, std::enable_if_t<V && !Const, int> = 0>
+            explicit operator SetIterator<V>() {
+                return SetIterator<V>(n_);
+            }
+
+            // Conversion operator for converting SetIterator<true> to SetIterator<false>
+            template <bool V, std::enable_if_t<!V && Const, int> = 0>
+            explicit operator SetIterator<V>() {
+                return SetIterator<V>(n_);
+            }
+
+            ~SetIterator() = default;
 
 
-//            template< bool _Const = Const >
-//            std::enable_if_t< _Const, reference >
             reference operator*() const {
                 return n_->__key_;
             }
 
-//            template< bool _Const = Const, bool is_map = __is_map >
-//            std::enable_if_t< !_Const && is_map,  reference >
-//            operator*() {
-//                return n_->__key_;
-//            }
 
             pointer operator->() const{
                 return &(n_->__key_);
             }
-
-//            template< bool _Const = Const>
-//            std::enable_if_t< _Const, pointer >
-//            operator->() const{
-//                return &(n_->__key_);
-//            }
 
             /**
              * @brief Starting from leftmost node, check if right node exists. If it does, go to it's leftmost node
@@ -142,8 +143,14 @@ namespace s21{
             Node *n_;
         };
 
-        using iterator = SetIterator<false>;
-        using const_iterator = SetIterator<false>;
+
+//        using iterator = typename std::conditional_t<is_set_base<set>::value, SetIterator<true>, SetIterator<false>>;
+        using const_iterator = SetIterator<true>;
+//        template <typename T>
+//        using iterator = typename std::conditional_t<T::using_flag, SetIterator<true>, SetIterator<false>>;
+//static constexpr bool using_flag = false;
+//and change it in derived constructors
+
 
 
         set() : size_(0), comparator_(Compare()), alloc_(), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
@@ -504,6 +511,7 @@ namespace s21{
         }
 
     protected:
+
         set(const set &s, std::true_type) :
                 size_(0), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
             InitNode(fake_root_);
@@ -836,4 +844,3 @@ namespace s21{
 
 } //namespace s21
 #endif //S21_CONTAINERS_S21_SET_H_
-///tests for map

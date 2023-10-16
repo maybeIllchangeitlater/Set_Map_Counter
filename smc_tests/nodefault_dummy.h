@@ -14,6 +14,12 @@ namespace s21{
         bool operator<(const NoDefaultDummyT& rhs) const{
             return x < rhs.x;
         }
+        bool operator>(const NoDefaultDummyT& rhs) const{
+            return x > rhs.x;
+        }
+        bool operator==(const NoDefaultDummyT& rhs) const{
+            return x == rhs.x;
+        }
         int x;
     };
     template<typename T>

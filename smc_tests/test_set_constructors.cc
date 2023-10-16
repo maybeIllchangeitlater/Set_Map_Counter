@@ -312,22 +312,18 @@ TEST(ConstructorsAndAssignments, MoveOperatorSTDAlloc){
     ASSERT_EQ(*itt1++, *itt2++);
 }
 
-//TEST(ConstructorsAndAssignments, MoveAndCopySelfAssignment){
-//    s21::set<unsigned long long>abobus_no_copus;
-//    for(int i = 0; i < 10; ++i){
-//        abobus_no_copus.emplace(i*i);
-//    }
-//    abobus_no_copus = abobus_no_copus;
-//    abobus_no_copus = std::move(abobus_no_copus);
-//
-//    ASSERT_EQ(*abobus_no_copus.begin(), 0);
-//    ASSERT_EQ(*(++abobus_no_copus.begin()), 1);
-//}
-//smc_tests/test_set_constructors.cc:320:21: error: explicitly assigning value of variable of type 's21::set<unsigned long long>' to itself [-Werror,-Wself-assign-overloaded]
-//abobus_no_copus = abobus_no_copus;
-//~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~
-//smc_tests/test_set_constructors.cc:321:21: error: explicitly moving variable of type 's21::set<unsigned long long>' to itself [-Werror,-Wself-move]
-//abobus_no_copus = std::move(abobus_no_copus);
-//~~~~~~~~~~~~~~~ ^           ~~~~~~~~~~~~~~~
-///run without flags to get this coverage kek
+/**
+ * @brief depending on compiler self-assignment might not compile. just comment this test
+ */
+TEST(ConstructorsAndAssignments, MoveAndCopySelfAssignment){
+    s21::set<unsigned long long>abobus_no_copus;
+    for(int i = 0; i < 10; ++i){
+        abobus_no_copus.emplace(i*i);
+    }
+    abobus_no_copus = abobus_no_copus;
+    abobus_no_copus = std::move(abobus_no_copus);
+
+    ASSERT_EQ(*abobus_no_copus.begin(), 0);
+    ASSERT_EQ(*(++abobus_no_copus.begin()), 1);
+}
 
