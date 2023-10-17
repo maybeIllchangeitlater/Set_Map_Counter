@@ -4,7 +4,7 @@
 #include "s21_set.h"
 
 namespace s21 {
-    template<typename Key, typename T, typename Compare = std::less<>, typename Alloc = MyTreeAllocator<std::pair<const Key, T>>>
+    template<typename Key, typename T, typename Compare = MyComparator<const Key>, typename Alloc = MyTreeAllocator<std::pair<const Key, T>>>
     class map : public set<std::pair<const Key, T>, Compare, Alloc> {
     public:
         using Base = set<std::pair<const Key, T>, Compare, Alloc>;
@@ -23,8 +23,6 @@ namespace s21 {
         using Base::insert;
         using Base::find;
         using Base::erase;
-        using Base::begin;
-        using Base::end;
 
         map(const map &m) : Base(m) {}
 
@@ -59,7 +57,7 @@ namespace s21 {
             return *this;
         }
 
-        ~map() override = default;
+        ~map() = default;
 
         /**
          * @brief returns iterator to element with Key key or past-end iterator
@@ -222,29 +220,7 @@ namespace s21 {
         bool contains(const key_type &key) const noexcept {
             return find(key) != Base::end();
         }
-
-    iterator begin() {
-        return iterator(Base::fake_root_->__left_);
-    }
-
-    iterator end() {
-        return iterator(Base::fake_root_);
-    }
-//    const_iterator begin() const {
-//        return Base::begin();
-//    }
-//
-//    const_iterator end() const{
-//        return Base::end();
-//    }
-
-
-    protected:
-
-
-        bool WrappedCompare(const value_type &lhs, const value_type &rhs) const override {
-            return Base::comparator_(lhs.first, rhs.first);
-        };
+        
     };
 
 

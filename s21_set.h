@@ -155,13 +155,13 @@ namespace s21{
         protected:
             Node *n_;
         };
-
+    protected:
         template <typename U>
         struct is_map_pair : std::false_type {};
 
         template <typename First, typename Second>
         struct is_map_pair<std::pair<const First, Second>> : std::true_type {};
-
+    public:
         using iterator = typename std::conditional<is_map_pair<T>::value, SetIterator<false>, SetIterator<true>>::type;
         using const_iterator = SetIterator<true>;
 
@@ -253,7 +253,7 @@ namespace s21{
             return *this;
         }
 
-        virtual ~set(){
+        ~set(){
             clear();
             if(fake_root_) {
                 std::allocator_traits<allocator_type_node>::deallocate(node_alloc_, fake_root_, 1);
@@ -551,10 +551,13 @@ namespace s21{
         }
 
         /**
-         * @brief purely for inheritance. Can be changed with decorator but f me a
+         * @brief purely for inheritance
          */
-        virtual bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
-            return comparator_(lhs, rhs);
+        bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
+            if constexpr(is_map_pair<T>::value)
+                return comparator_(lhs.first, rhs.first);
+            else
+                return comparator_(lhs, rhs);
         }
 
         template <typename... Args>
@@ -845,11 +848,6 @@ namespace s21{
                 std::true_type,
                 std::false_type
         > kComparator_moves{};
-//        static constexpr const std::conditional_t<
-//        std::is_same_v<T, std::pair<const typename T::first_type, typename T::second_type>>,
-//        std::true_type,
-//        std::false_type
-//        >kIsMap{};
         size_type size_;
         /**
          * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
@@ -862,4 +860,5 @@ namespace s21{
     };
 
 } //namespace s21
+///there is a nuance. set<const T, U> will work like a map without some map functional. On the other hand, wtf is set<const T, U>
 #endif //S21_CONTAINERS_S21_SET_H_
