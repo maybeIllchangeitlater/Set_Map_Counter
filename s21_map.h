@@ -220,7 +220,7 @@ namespace s21 {
         bool contains(const key_type &key) const noexcept {
             return find(key) != Base::end();
         }
-        
+
     };
 
 

@@ -20,18 +20,76 @@ protected:
         map_m_ndd.clear();
         map_s_s.clear();
         map_d_v.clear();
+
     }
 
     s21::map<S21::S21Matrix, s21::NoDefaultDummyT> map_m_ndd;
     s21::map<std::string, s21::set<int>, std::less<>, std::allocator<std::pair<const std::string, s21::set<int>>>> map_s_s;
     s21::map<s21::NoDefaultDummyT, std::vector<int>, std::greater<>>map_d_v;
-
 };
+
+TEST(MapOnlyConstructors, copy) {
+
+    s21::map<int, int> aboba{std::make_pair(1, 2), std::make_pair(2, 2), std::make_pair(555, 2)};
+    s21::map<int, int> abobus(aboba);
+
+    auto it = abobus.begin();
+
+    for (const auto &[k, v]: aboba) {
+        ASSERT_EQ(it->first, k);
+        ASSERT_EQ(it++->second, v);
+    }
+}
+
+TEST(MapOnlyConstructors, move) {
+
+    s21::map<int, int> aboba{std::make_pair(1, 2), std::make_pair(2, 2), std::make_pair(555, 2)};
+    s21::map<int, int> abobus(aboba);
+    s21::map<int, int> biba(std::move(abobus));
+
+    auto it = biba.begin();
+
+    for (const auto &[k, v]: aboba) {
+        ASSERT_EQ(it->first, k);
+        ASSERT_EQ(it++->second, v);
+    }
+}
+
+TEST(MapOnlyConstructors, copy_assign) {
+
+    s21::map<int, int> aboba{std::make_pair(1, 2), std::make_pair(2, 2), std::make_pair(555, 2)};
+    s21::map<int, int> abobus;
+    abobus = aboba;
+
+    auto it = abobus.begin();
+
+    for (const auto &[k, v]: aboba) {
+        ASSERT_EQ(it->first, k);
+        ASSERT_EQ(it++->second, v);
+    }
+}
+
+TEST(MapOnlyConstructors, move_assign) {
+
+    s21::map<int, int> aboba{std::make_pair(1, 2), std::make_pair(2, 2), std::make_pair(555, 2)};
+    s21::map<int, int> abobus(aboba);
+    s21::map<int, int> biba;
+    biba = std::move(abobus);
+
+    auto it = biba.begin();
+
+    for (const auto &[k, v]: aboba) {
+        ASSERT_EQ(it->first, k);
+        ASSERT_EQ(it++->second, v);
+    }
+}
 
 TEST_F(MapTestFrozen, find_key){
 
     ASSERT_EQ(map_m_ndd.find(S21::S21Matrix()), ++map_m_ndd.begin());
+
     ASSERT_EQ(map_s_s.find("aboba"), map_s_s.begin());
+
     ASSERT_EQ(map_d_v.find(s21::NoDefaultDummyT(53)), --map_d_v.end());
 
 }
@@ -39,6 +97,14 @@ TEST_F(MapTestFrozen, find_key){
 TEST_F(MapTestFrozen, operatorsquares){
 
     ASSERT_EQ(map_s_s["aboba"], s21::set<int>());
+    map_s_s["aboba"] = s21::set<int>{1,2,3,4,5};
+    ASSERT_EQ(map_s_s["aboba"], s21::set<int>({1, 2, 3, 4, 5}));
+
+    ASSERT_TRUE(!map_d_v.contains(s21::NoDefaultDummyT(55)));
+    map_d_v[s21::NoDefaultDummyT(55)];
+    ASSERT_EQ(map_d_v[s21::NoDefaultDummyT(55)], std::vector<int>());
+    map_d_v[s21::NoDefaultDummyT(55)] = std::vector<int>{1,2,22};
+    ASSERT_EQ(map_d_v[s21::NoDefaultDummyT(55)], std::vector<int>({1,2,22}));
 
 }
 
@@ -71,6 +137,15 @@ TEST_F(MapTestFrozen, erase_key){
     ASSERT_TRUE(map_d_v.contains(s21::NoDefaultDummyT(53)));
     map_d_v.erase(s21::NoDefaultDummyT(53));
     ASSERT_TRUE(!map_d_v.contains(s21::NoDefaultDummyT(53)));
+
+}
+
+TEST_F(MapTestFrozen, operatorat){
+
+    ASSERT_EQ(map_s_s.at("aboba"), s21::set<int>());
+    map_s_s.at("aboba") = s21::set<int>{1,2,3};
+    ASSERT_EQ(map_s_s.at("aboba"), s21::set<int>({1,2,3}));
+    ASSERT_ANY_THROW(map_s_s.at("asdq"));
 
 }
 
