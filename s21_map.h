@@ -21,7 +21,6 @@ namespace s21 {
 
         using Base::Base;
         using Base::insert;
-        using Base::find;
         using Base::erase;
 
         map(const map &m) : Base(m) {}
@@ -63,13 +62,15 @@ namespace s21 {
          * @brief returns iterator to element with Key key or past-end iterator
          */
         iterator find(const key_type &key) {
-            ///not using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
-            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
-                    sizeof(std::pair<key_type, mapped_type>)));
-            crutchify->first = key;
-            auto tempIterator = find(*crutchify);
-            ::operator delete(crutchify);
-            return static_cast<iterator>(tempIterator);
+            ///not just using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
+            ///placement new might cause keks
+            return iterator(MapSearch(key));
+//            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
+//                    sizeof(std::pair<key_type, mapped_type>)));
+//            crutchify->first = key;
+//            auto tempIterator = find(*crutchify);
+//            ::operator delete(crutchify);
+//            return static_cast<iterator>(tempIterator);
         }
 
         /**
@@ -77,12 +78,13 @@ namespace s21 {
         */
         const_iterator find(const key_type &key) const {
             ///not using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
-            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
-                    sizeof(std::pair<key_type, mapped_type>)));
-            crutchify->first = key;
-            auto it = find(*crutchify);
-            ::operator delete(crutchify);
-            return it;
+            return const_iterator(MapSearch(key));
+//            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
+//                    sizeof(std::pair<key_type, mapped_type>)));
+//            crutchify->first = key;
+//            auto it = find(*crutchify);
+//            ::operator delete(crutchify);
+//            return it;
         }
 
 
@@ -91,12 +93,9 @@ namespace s21 {
          * @brief erases element with Key key. If element doesn't exist does nothing
          */
         void erase(const key_type &key) {
-            ///not using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
-            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
-                    sizeof(std::pair<key_type, mapped_type>)));
-            crutchify->first = key;
-            erase(*crutchify);
-            ::operator delete(crutchify);
+            auto it = find(key);
+            if(it != Base::end())
+                erase(it);
         }
 
         /**
@@ -166,7 +165,7 @@ namespace s21 {
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
         std::pair<iterator, bool> insert_or_assign(const key_type &key, const mapped_type &obj) {
-            auto it = find(std::make_pair(key, obj));
+            auto it = find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, obj));
             } else {
@@ -180,7 +179,7 @@ namespace s21 {
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
         std::pair<iterator, bool> insert_or_assign(key_type &&key, mapped_type &&obj) {
-            auto it = find(std::make_pair(key, obj));
+            auto it = find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, obj));
             } else {
@@ -194,7 +193,7 @@ namespace s21 {
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
         std::pair<iterator, bool> insert_or_assign(const key_type &key, mapped_type &&obj) {
-            auto it = find(std::make_pair(key, obj));
+            auto it = find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, obj));
             } else {
@@ -208,7 +207,7 @@ namespace s21 {
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
         std::pair<iterator, bool> insert_or_assign(key_type &key, const mapped_type &obj) {
-            auto it = find(std::make_pair(key, obj));
+            auto it = find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, obj));
             } else {
@@ -220,6 +219,21 @@ namespace s21 {
         bool contains(const key_type &key) const noexcept {
             return find(key) != Base::end();
         }
+
+        typename Base::Node* MapSearch(const key_type& key) const noexcept{
+                typename Base::Node *tmp = Base::fake_root_->__left_;
+                while (tmp) {
+                    if (Base::comparator_(key, tmp->__key_.first)) {
+                        tmp = tmp->__left_;
+                    } else if (Base::comparator_(tmp->__key_.first, key)) {
+                        tmp = tmp->__right_;
+                    } else {
+                        return tmp;
+                    }
+                }
+                return Base::fake_root_;
+            }
+
 
     };
 

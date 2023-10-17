@@ -444,13 +444,13 @@ namespace s21{
         }
 
         iterator begin(){
-            return iterator(FindLeftmost(fake_root_->__left_));
+            return fake_root_->__left_ ? iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
         iterator end(){
             return iterator(fake_root_);
         }
         const_iterator begin() const {
-            return const_iterator(FindLeftmost(fake_root_->__left_));
+            return fake_root_->__left_ ? const_iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
 
         const_iterator end() const{
@@ -458,7 +458,7 @@ namespace s21{
         }
 
         const_iterator cbegin() const{
-            return const_iterator(FindLeftmost(fake_root_->__left_));
+            return fake_root_->__left_ ? const_iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
 
         const_iterator cend() const{
@@ -815,7 +815,7 @@ namespace s21{
             return root ? root->__height_ : 0;
         }
 
-        static Node *FindLeftmost(Node *root) noexcept { //dereferencing nullptr is not an exception (not going to happen I hope)
+        static Node *FindLeftmost(Node *root) noexcept {
             return root->__left_ ? FindLeftmost(root->__left_) : root;
         }
 

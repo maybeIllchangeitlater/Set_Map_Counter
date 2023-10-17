@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <map>
 #include "dummy_collection.h"
 #include "../s21_map.h"
 #include <string>
@@ -90,7 +91,7 @@ TEST_F(MapTestFrozen, find_key){
 
     ASSERT_EQ(map_s_s.find("aboba"), map_s_s.begin());
 
-    ASSERT_EQ(map_d_v.find(s21::NoDefaultDummyT(53)), --map_d_v.end());
+    ASSERT_EQ(map_d_v.find(s21::NoDefaultDummyT(1))->second, (--map_d_v.end())->second); //greater
 
 }
 
