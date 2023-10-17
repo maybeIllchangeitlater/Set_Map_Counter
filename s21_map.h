@@ -63,28 +63,15 @@ namespace s21 {
          */
         iterator find(const key_type &key) {
             ///not just using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
-            ///placement new might cause keks
+            ///operator new for mapped_type might cause unitialized read keks, easier to rewrite search for key only
             return iterator(MapSearch(key));
-//            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
-//                    sizeof(std::pair<key_type, mapped_type>)));
-//            crutchify->first = key;
-//            auto tempIterator = find(*crutchify);
-//            ::operator delete(crutchify);
-//            return static_cast<iterator>(tempIterator);
         }
 
         /**
         * @brief returns const_iterator to element with Key key  or past-end iterator
         */
         const_iterator find(const key_type &key) const {
-            ///not using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
             return const_iterator(MapSearch(key));
-//            auto *crutchify = static_cast<std::pair<key_type, mapped_type> *>(::operator new(
-//                    sizeof(std::pair<key_type, mapped_type>)));
-//            crutchify->first = key;
-//            auto it = find(*crutchify);
-//            ::operator delete(crutchify);
-//            return it;
         }
 
 
@@ -146,7 +133,7 @@ namespace s21 {
         mapped_type &operator[](Key &&key) {
             auto it = find(key);
             if (it == Base::end()) {
-                return insert(std::make_pair(key, T())).first->second;
+                return insert(std::make_pair(std::move(key), T())).first->second;
             } else {
                 return it->second;
             }
@@ -156,62 +143,46 @@ namespace s21 {
          * @brief attempts to insert key, mapped type pair. returns iterator to element with key and
          * true if insertion took place, false otherwise
          */
-        std::pair<iterator, bool> insert(const key_type &key, const mapped_type &obj) {
-            return insert(std::make_pair(key, obj));
+        template <class M>
+        std::pair<iterator, bool> insert(const key_type &key, M&& obj) {
+            ///template and forward instead of 4 different overloads because compiler finds them ambiguous
+            ///passing garbage to M thankfully leads to CE. Praise compiler writers
+            return insert(std::make_pair(key, std::forward<M>(obj)));
+        }
+        /**
+         * @brief attempts to insert key, mapped type pair. returns iterator to element with key and
+         * true if insertion took place, false otherwise
+         */
+        template <class M>
+        std::pair<iterator, bool> insert(key_type &&key, M&& obj) {
+            return insert(std::make_pair(std::move(key), std::forward<M>(obj)));
         }
 
         /**
          * @brief if key already exists changes object mapped to it; otherwise inserts pair\n
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
-        std::pair<iterator, bool> insert_or_assign(const key_type &key, const mapped_type &obj) {
+        template <class M>
+        std::pair<iterator, bool> insert_or_assign(const key_type& key, M&& obj) {
             auto it = find(key);
             if (it == Base::end()) {
-                return insert(std::make_pair(key, obj));
+                return insert(std::make_pair(key, std::forward<M>(obj)));
             } else {
-                it->second = obj;
+                it->second = std::forward<M>(obj);
                 return std::make_pair(it, false);
             }
         }
-
         /**
          * @brief if key already exists changes object mapped to it; otherwise inserts pair\n
          * returns iterator to element in map and true if insertion took place/false if it didn't
          */
-        std::pair<iterator, bool> insert_or_assign(key_type &&key, mapped_type &&obj) {
+        template <class M>
+        std::pair<iterator, bool> insert_or_assign(key_type&& key, M&& obj) {
             auto it = find(key);
             if (it == Base::end()) {
-                return insert(std::make_pair(key, obj));
+                return insert(std::make_pair(std::move(key), std::forward<M>(obj)));
             } else {
-                it->second = obj;
-                return std::make_pair(it, false);
-            }
-        }
-
-        /**
-         * @brief if key already exists changes object mapped to it; otherwise inserts pair\n
-         * returns iterator to element in map and true if insertion took place/false if it didn't
-         */
-        std::pair<iterator, bool> insert_or_assign(const key_type &key, mapped_type &&obj) {
-            auto it = find(key);
-            if (it == Base::end()) {
-                return insert(std::make_pair(key, obj));
-            } else {
-                it->second = obj;
-                return std::make_pair(it, false);
-            }
-        }
-
-        /**
-         * @brief if key already exists changes object mapped to it; otherwise inserts pair\n
-         * returns iterator to element in map and true if insertion took place/false if it didn't
-         */
-        std::pair<iterator, bool> insert_or_assign(key_type &key, const mapped_type &obj) {
-            auto it = find(key);
-            if (it == Base::end()) {
-                return insert(std::make_pair(key, obj));
-            } else {
-                it->second = obj;
+                it->second = std::forward<M>(obj);
                 return std::make_pair(it, false);
             }
         }
@@ -219,6 +190,8 @@ namespace s21 {
         bool contains(const key_type &key) const noexcept {
             return find(key) != Base::end();
         }
+
+    protected:
 
         typename Base::Node* MapSearch(const key_type& key) const noexcept{
                 typename Base::Node *tmp = Base::fake_root_->__left_;

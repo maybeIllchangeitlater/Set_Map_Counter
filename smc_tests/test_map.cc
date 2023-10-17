@@ -107,13 +107,22 @@ TEST_F(MapTestFrozen, operatorsquares){
     map_d_v[s21::NoDefaultDummyT(55)] = std::vector<int>{1,2,22};
     ASSERT_EQ(map_d_v[s21::NoDefaultDummyT(55)], std::vector<int>({1,2,22}));
 
+    std::string const_key_test(map_s_s.begin()->first);
+    ASSERT_EQ(map_s_s[const_key_test], s21::set<int>({1, 2, 3, 4, 5}));
+    map_s_s[const_key_test] = s21::set<int>();
+    ASSERT_EQ(map_s_s[const_key_test],  s21::set<int>());
+
 }
 
 TEST_F(MapTestFrozen, insert_key_obj){
 
+    S21::S21Matrix m_in(9,9);
+
     ASSERT_TRUE(!map_m_ndd.contains(S21::S21Matrix(6,6)));
     map_m_ndd.insert(S21::S21Matrix(6,6), s21::NoDefaultDummyT(3));
     ASSERT_TRUE(map_m_ndd.contains(S21::S21Matrix(6,6)));
+    ASSERT_TRUE(!map_m_ndd.contains(m_in));
+    ASSERT_EQ(map_m_ndd.insert(m_in, s21::NoDefaultDummyT(44)).first->second, s21::NoDefaultDummyT(44));
 
     ASSERT_TRUE(!map_s_s.contains("abobus"));
     map_s_s.insert("abobus", s21::set<int>({-555, -655}));
@@ -147,6 +156,37 @@ TEST_F(MapTestFrozen, operatorat){
     map_s_s.at("aboba") = s21::set<int>{1,2,3};
     ASSERT_EQ(map_s_s.at("aboba"), s21::set<int>({1,2,3}));
     ASSERT_ANY_THROW(map_s_s.at("asdq"));
+
+    const auto cont_at_coverage(map_s_s);
+    ASSERT_EQ(cont_at_coverage.at("aboba"), s21::set<int>({1,2,3}));
+
+}
+
+TEST_F(MapTestFrozen, insert_or_assigns){
+
+    S21::S21Matrix moo;
+    S21::S21Matrix moo_not_in(16,16);
+    s21::NoDefaultDummyT noo(0);
+    s21::set<int> ssset{5,55,555};
+
+    ASSERT_EQ(map_s_s.at("aboba"), s21::set<int>());
+    ASSERT_EQ (map_s_s.insert_or_assign("aboba", s21::set<int>({1,2,3})).first->second, s21::set<int>({1,2,3}));
+
+    ASSERT_TRUE(!map_s_s.contains("asdq"));
+    ASSERT_EQ(map_s_s.insert_or_assign("asdq", s21::set<int>({1})).first->second, s21::set<int>({1}));
+
+    ASSERT_EQ(map_m_ndd.at(moo), s21::NoDefaultDummyT(3));
+    ASSERT_EQ(map_m_ndd.insert_or_assign(moo, noo).first->second, noo);
+
+    ASSERT_TRUE(!map_m_ndd.contains(moo_not_in));
+    ASSERT_EQ(map_m_ndd.insert_or_assign(moo_not_in, noo).first->second, noo);
+
+    ASSERT_TRUE(!map_d_v.contains(noo));
+    ASSERT_EQ(map_d_v.insert_or_assign(noo, std::vector<int>(55)).first->second, std::vector<int>(55));
+
+    ASSERT_TRUE(!map_s_s.contains("qwerty"));
+    ASSERT_EQ(map_s_s.insert_or_assign("qwerty", ssset).first->second, ssset);
+
 
 }
 

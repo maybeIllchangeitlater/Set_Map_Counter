@@ -76,17 +76,15 @@ namespace s21{
 
             explicit SetIterator(Node *n) : n_(n) {}
 
-            // Conversion operator for converting SetIterator<false> to SetIterator<true>
-            template <bool V, std::enable_if_t<V && !Const, int> = 0>
-            explicit operator SetIterator<V>() {
-                return SetIterator<V>(n_);
-            }
-
-            // Conversion operator for converting SetIterator<true> to SetIterator<false>
-            template <bool V, std::enable_if_t<!V && Const, int> = 0>
-            explicit operator SetIterator<V>() {
-                return SetIterator<V>(n_);
-            }
+            //left them in just in case but likely never needed
+//            template <bool V, std::enable_if_t<V && !Const, int> = 0>
+//            explicit operator SetIterator<V>() {
+//                return SetIterator<V>(n_);
+//            }
+//            template <bool V, std::enable_if_t<!V && Const, int> = 0>
+//            explicit operator SetIterator<V>() {
+//                return SetIterator<V>(n_);
+//            }
 
             ~SetIterator() = default;
 
@@ -526,6 +524,12 @@ namespace s21{
 
     protected:
 
+        static constexpr const std::conditional_t<
+                std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
+                std::true_type,
+                std::false_type
+        > kComparator_moves{};
+
         set(const set &s, std::true_type) :
                 size_(0), comparator_(s.comparator_), alloc_(s.get_allocator()), node_alloc_(alloc_), fake_root_(std::allocator_traits<allocator_type_node>::allocate(node_alloc_, 1)) {
             InitNode(fake_root_);
@@ -841,13 +845,6 @@ namespace s21{
             root->__height_ = 1;
         }
 
-
-    protected:
-        static constexpr const std::conditional_t<
-                std::is_nothrow_move_constructible<Compare>::value || !std::is_copy_constructible<Compare>::value,
-                std::true_type,
-                std::false_type
-        > kComparator_moves{};
         size_type size_;
         /**
          * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
