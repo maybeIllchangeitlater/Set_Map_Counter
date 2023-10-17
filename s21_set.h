@@ -14,6 +14,7 @@
 //template<typename T>
 //class SetIterator;
 namespace s21{
+
     template<typename T>
     struct MyComparator {
         bool operator()(const T &lhs, const T &rhs) const {
@@ -21,6 +22,18 @@ namespace s21{
         }
 
     }; //no real reason, just for fun.
+//    template<bool Const>
+//    class SetIterator;
+//    template <typename T>
+//    struct SetIteratorSelector {
+//        using type = SetIterator<false>;
+//    };
+//
+//    template <typename T = std::pair<typename T1, typename T2>
+//    struct SetIteratorSelector<std::pair<const typename T::first_type, typename T::second_type>> {
+//        using type = SetIterator<true>;
+//    };
+
 
 
 
@@ -143,13 +156,16 @@ namespace s21{
             Node *n_;
         };
 
+        template <typename U>
+        struct is_map_pair : std::false_type {};
 
-//        using iterator = typename std::conditional_t<is_set_base<set>::value, SetIterator<true>, SetIterator<false>>;
+        template <typename First, typename Second>
+        struct is_map_pair<std::pair<const First, Second>> : std::true_type {};
+
+        using iterator = typename std::conditional<is_map_pair<T>::value, SetIterator<false>, SetIterator<true>>::type;
         using const_iterator = SetIterator<true>;
-//        template <typename T>
-//        using iterator = typename std::conditional_t<T::using_flag, SetIterator<true>, SetIterator<false>>;
-//static constexpr bool using_flag = false;
-//and change it in derived constructors
+
+
 
 
 
@@ -346,9 +362,9 @@ namespace s21{
             return const_iterator(Search(value));
         }
         /**
-         * @brief returns iterator to position of node with input value or or past-end iterator
-         */
-        iterator find(const key_type &value) noexcept {
+        * @brief returns iterator to position of node with input value or past-end iterator
+        */
+        iterator find(const value_type &value) noexcept {
             return iterator(Search(value));
         }
 
@@ -427,14 +443,12 @@ namespace s21{
             }
         }
 
-        iterator begin() {
+        iterator begin(){
             return iterator(FindLeftmost(fake_root_->__left_));
         }
-
-        iterator end() {
+        iterator end(){
             return iterator(fake_root_);
         }
-
         const_iterator begin() const {
             return const_iterator(FindLeftmost(fake_root_->__left_));
         }
@@ -831,6 +845,11 @@ namespace s21{
                 std::true_type,
                 std::false_type
         > kComparator_moves{};
+//        static constexpr const std::conditional_t<
+//        std::is_same_v<T, std::pair<const typename T::first_type, typename T::second_type>>,
+//        std::true_type,
+//        std::false_type
+//        >kIsMap{};
         size_type size_;
         /**
          * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
