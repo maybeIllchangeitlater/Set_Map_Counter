@@ -71,10 +71,6 @@ namespace s21{
             Base::swap(other);
         }
 
-        void merge(Counter& other){
-            Base::merge(other);
-        }
-
         /**
          * @brief adds all elements from 2 counters and returns result as a 3rd
          */
@@ -245,6 +241,12 @@ namespace s21{
                 if(it->second <= 0)
                     erase(key);
             }
+        }
+        /**
+         * @brief remove count from key element. if count drops to zero the element is removed
+         */
+        void erase(const value_type& value){
+            erase(value.first, value.second);
         }
         /**
          * @brief returns set based on Counter (no duplicates)
