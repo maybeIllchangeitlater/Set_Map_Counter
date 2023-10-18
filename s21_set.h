@@ -22,28 +22,32 @@ namespace s21{
         }
 
     }; //no real reason, just for fun.
-//    template<bool Const>
-//    class SetIterator;
-//    template <typename T>
-//    struct SetIteratorSelector {
-//        using type = SetIterator<false>;
-//    };
-//
-//    template <typename T = std::pair<typename T1, typename T2>
-//    struct SetIteratorSelector<std::pair<const typename T::first_type, typename T::second_type>> {
-//        using type = SetIterator<true>;
-//    };
-
-
 
 
     template<typename T, typename Compare = MyComparator<T>, typename Allocator = MyTreeAllocator<T>>
     class set {
-    public:
 
+    protected:
+        template <typename U>
+        struct is_map_pair : std::false_type {};
+
+        template <typename First, typename Second>
+        struct is_map_pair<std::pair<const First, Second>> : std::true_type {};
+
+        template <typename U>
+        struct key_selector {
+            using type = U;
+        };
+
+        template <typename First, typename Second>
+        struct key_selector<std::pair<First, Second>> {
+            using type = typename std::conditional<std::is_const<First>::value, const First, T>::type;
+        };
+
+    public:
         using allocator_type = Allocator;
-        using key_type = T;
-        using value_type = key_type;
+        using key_type = typename key_selector<T>::type;
+        using value_type = T;
         using reference = T &;
         using key_compare = Compare;
         using value_compare = key_compare;
@@ -51,6 +55,7 @@ namespace s21{
         using size_type = size_t;
         static_assert((std::is_same<typename allocator_type::value_type, value_type>::value),
                       "Allocator value type must be the same as value type");
+        static_assert(std::is_invocable_v<Compare, const key_type&, const key_type&>, "Comparator is not callable");
 
         struct Node {
             value_type __key_;
@@ -153,13 +158,6 @@ namespace s21{
         protected:
             Node *n_;
         };
-    protected:
-        template <typename U>
-        struct is_map_pair : std::false_type {};
-
-        template <typename First, typename Second>
-        struct is_map_pair<std::pair<const First, Second>> : std::true_type {};
-    public:
         using iterator = typename std::conditional<is_map_pair<T>::value, SetIterator<false>, SetIterator<true>>::type;
         using const_iterator = SetIterator<true>;
 
@@ -203,6 +201,15 @@ namespace s21{
         }
 
         set(std::initializer_list<value_type> init, const Allocator& alloc) : set(init, Compare(), alloc) {}
+
+        template<typename InputIt>
+        set(InputIt first, InputIt last){
+            if constexpr (std::is_base_of_v<std::input_iterator_tag, typename std::iterator_traits<InputIt>::iterator_category>) {
+                for (InputIt it = first; it != last;++it){
+                    Append(*it);
+                }
+            }
+        }
 
 
         /**
@@ -269,7 +276,7 @@ namespace s21{
         template<typename ... Args >
         std::pair<iterator, bool> emplace(Args&&... args){
             Node * target = AllocateAndConstruct(std::forward<Args>(args)...);
-            auto it = find(target->__key_);
+            auto it = find(FindHelper(target->__key_));
             if (it != end()) {
                 DestructAndDeallocate(target);
                 return std::make_pair(it, false);
@@ -284,7 +291,7 @@ namespace s21{
          * to existing node
          */
         std::pair<iterator, bool> insert(const value_type& value) {
-            auto it = find(value);
+            auto it = find(FindHelper(value));
             if (it != end()) {
                 return std::make_pair(it, false);
             } else {
@@ -299,7 +306,7 @@ namespace s21{
          * to existing node
          */
         std::pair<iterator, bool> insert(value_type && value){
-            auto it = find(value);
+            auto it = find(FindHelper(value));
             if (it != end()) {
                 return std::make_pair(it, false);
             } else {
@@ -360,9 +367,9 @@ namespace s21{
             return const_iterator(Search(value));
         }
         /**
-        * @brief returns iterator to position of node with input value or past-end iterator
-        */
-        iterator find(const value_type &value) noexcept {
+         * @brief returns const iterator to position of node with input value or past-end iterator
+         */
+        iterator find(const key_type &value) noexcept {
             return iterator(Search(value));
         }
 
@@ -372,11 +379,11 @@ namespace s21{
         /**
          * @brief Returns an iterator pointing to the first element that is not less than key
          */
-        iterator lower_bound(const key_type& key) const noexcept{
+        iterator lower_bound(const key_type& key) noexcept{
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (!WrappedCompare(tmp->__key_, key)){
+                if (!comparator_(FindHelper(tmp->__key_), key)){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -389,11 +396,11 @@ namespace s21{
         /**
          * @brief Returns an iterator pointing to the first element that is greater than key
          */
-        iterator upper_bound(const key_type& key) const noexcept {
+        iterator upper_bound(const key_type& key) noexcept {
             Node* tmp = fake_root_->__left_;
             Node* result = nullptr;
             while (tmp){
-                if (WrappedCompare(key, tmp->__key_)){
+                if (comparator_(key, FindHelper(tmp->__key_))){
                     result = tmp;
                     tmp = tmp->__left_;
                 }
@@ -402,6 +409,40 @@ namespace s21{
                 }
             }
             return iterator(result);
+        }
+        /**
+         * @brief Returns an iterator pointing to the first element that is not less than key
+         */
+        const_iterator lower_bound(const key_type& key) const noexcept{
+            Node* tmp = fake_root_->__left_;
+            Node* result = nullptr;
+            while (tmp){
+                if (!comparator_(FindHelper(tmp->__key_), key)){
+                    result = tmp;
+                    tmp = tmp->__left_;
+                }
+                else {
+                    tmp = tmp->__right_;
+                }
+            }
+            return const_iterator(result);
+        }
+        /**
+         * @brief Returns an iterator pointing to the first element that is greater than key
+         */
+        const_iterator upper_bound(const key_type& key) const noexcept {
+            Node* tmp = fake_root_->__left_;
+            Node* result = nullptr;
+            while (tmp){
+                if (comparator_(key, FindHelper(tmp->__key_))){
+                    result = tmp;
+                    tmp = tmp->__left_;
+                }
+                else {
+                    tmp = tmp->__right_;
+                }
+            }
+            return const_iterator(result);
         }
 
         /**
@@ -421,8 +462,8 @@ namespace s21{
         void merge(set& other){
             auto one_step_behind = other.end();
             for(auto it = other.begin(); it != other.end(); ++it){
-                if(one_step_behind != other.end() && !contains(*one_step_behind)){
-                    auto root_and_extract = other.Extract(other.fake_root_->__left_, *one_step_behind);
+                if(one_step_behind != other.end() && !contains(FindHelper(*one_step_behind))){
+                    auto root_and_extract = other.Extract(other.fake_root_->__left_, FindHelper(*one_step_behind));
                     other.fake_root_->__left_ = root_and_extract.first;
                     other.fake_root_->__left_->__parent_ = other.fake_root_;
                     InitNode(root_and_extract.second);
@@ -431,35 +472,35 @@ namespace s21{
                 }
                 one_step_behind = it;
             }
-            if(one_step_behind != other.end() && !contains(*one_step_behind)){
-                auto root_and_extract = other.Extract(other.fake_root_->__left_, *one_step_behind);
+            if(one_step_behind != other.end() && !contains(FindHelper(*one_step_behind))){
+                auto root_and_extract = other.Extract(other.fake_root_->__left_, FindHelper(*one_step_behind));
                 other.fake_root_->__left_ = root_and_extract.first;
-                other.fake_root_->__left_->__parent_ = other.fake_root_;
+                if(other.fake_root_->__left_) other.fake_root_->__left_->__parent_ = other.fake_root_;
                 InitNode(root_and_extract.second);
                 fake_root_->__left_ = Insert(fake_root_->__left_, root_and_extract.second);
                 ++size_;
             }
         }
 
-        iterator begin(){
+        iterator begin() noexcept{
             return fake_root_->__left_ ? iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
-        iterator end(){
+        iterator end() noexcept{
             return iterator(fake_root_);
         }
-        const_iterator begin() const {
+        const_iterator begin() const noexcept {
             return fake_root_->__left_ ? const_iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
 
-        const_iterator end() const{
+        const_iterator end() const noexcept{
             return const_iterator(fake_root_);
         }
 
-        const_iterator cbegin() const{
+        const_iterator cbegin() const noexcept{
             return fake_root_->__left_ ? const_iterator(FindLeftmost(fake_root_->__left_)) : end();
         }
 
-        const_iterator cend() const{
+        const_iterator cend() const noexcept{
             return const_iterator(fake_root_);
         }
 
@@ -481,9 +522,6 @@ namespace s21{
             }
         }
         constexpr key_compare key_comp() const {
-            return comparator_;
-        }
-        constexpr key_compare value_comp() const {
             return comparator_;
         }
 
@@ -554,15 +592,6 @@ namespace s21{
             s.size_ = 0;
         }
 
-        /**
-         * @brief purely for inheritance
-         */
-        bool WrappedCompare(const value_type& lhs, const value_type& rhs) const{
-            if constexpr(is_map_pair<T>::value)
-                return comparator_(lhs.first, rhs.first);
-            else
-                return comparator_(lhs, rhs);
-        }
 
         template <typename... Args>
         Node* AllocateAndConstruct(Args&&... args){
@@ -606,9 +635,9 @@ namespace s21{
          Node *Search(const key_type &value) const noexcept {
             Node *tmp = fake_root_->__left_;
             while (tmp) {
-                if (WrappedCompare(value, tmp->__key_)) {
+                if (comparator_(value, FindHelper(tmp->__key_))) {
                     tmp = tmp->__left_;
-                } else if (WrappedCompare(tmp->__key_, value)) {
+                } else if (comparator_(FindHelper(tmp->__key_), value)) {
                     tmp = tmp->__right_;
                 } else {
                     return tmp;
@@ -620,7 +649,7 @@ namespace s21{
          * @brief check for node, create node, insert node.
          */
         void Append(const_reference value){
-            if(!contains(value)) {
+            if (!contains(FindHelper(value))) {
                 Add(value);
             }
         }
@@ -629,7 +658,7 @@ namespace s21{
          * @brief insert for copy constructor/operator. Doesn't check if node already exists
          *
          */
-        void Add(const_reference  value){
+        void Add(const_reference value){
             Node* target = AllocateAndConstruct(value);
             fake_root_->__left_ = Insert(fake_root_->__left_, target);
             ++size_;
@@ -640,7 +669,7 @@ namespace s21{
         template <typename... Args>
         void EmplaceAppend(Args&&... args){
             Node * target = AllocateAndConstruct(std::forward<Args>(args)...);
-            if(!contains(target->__key_)){
+            if(!contains(FindHelper(target->__key_))){
                 fake_root_->__left_ = Insert(fake_root_->__left_, target);
                 ++size_;
             }else{
@@ -658,10 +687,10 @@ namespace s21{
                 //if node is a leaf
                 return target;
             }
-            if (WrappedCompare(target->__key_, root->__key_)) {
+            if (comparator_(FindHelper(target->__key_), FindHelper(root->__key_))) {
                 root->__left_ = Insert(root->__left_, target);
                 root->__left_->__parent_ = root;
-            } else if (WrappedCompare(root->__key_, target->__key_)) {
+            } else if (comparator_(FindHelper(root->__key_), FindHelper(target->__key_))) {
                 root->__right_ = Insert(root->__right_, target);
                 root->__right_->__parent_ = root;
             } else {
@@ -678,12 +707,12 @@ namespace s21{
         * (or you can change it to rightmost from left child, doesn't matter)
         */
         Node *Delete(Node *root, const key_type &value) {
-            if (WrappedCompare(value, root->__key_)) {
+            if (comparator_(value, FindHelper(root->__key_))) {
                 root->__left_ = Delete(root->__left_, value);
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (WrappedCompare(root->__key_, value)) {
+            } else if (comparator_(FindHelper(root->__key_), value)) {
                 root->__right_ = Delete(root->__right_, value);
                 if (root->__right_) {
                     root->__right_->__parent_ = root;
@@ -712,14 +741,14 @@ namespace s21{
          * @brief extracts Node from the tree, unlinking it but not deleting it
          */
         std::pair<Node*, Node*> Extract(Node* root, const key_type& value, Node* res = nullptr){
-            if (WrappedCompare(value, root->__key_)) {
+            if (comparator_(value, FindHelper(root->__key_))) {
                 auto extract = Extract(root->__left_, value, res);
                 root->__left_ = extract.first;
                 res = extract.second;
                 if (root->__left_) {
                     root->__left_->__parent_ = root;
                 }
-            } else if (WrappedCompare(root->__key_, value)) {
+            } else if (comparator_(FindHelper(root->__key_), value)) {
                 auto extract = Extract(root->__right_, value, res);
                 root->__right_ = extract.first;
                 res = extract.second;
@@ -845,9 +874,17 @@ namespace s21{
             root->__height_ = 1;
         }
 
+        constexpr const key_type& FindHelper(const value_type& value) const noexcept{
+            if constexpr(is_map_pair<T>::value){
+                return value.first;
+            }else{
+                return value;
+            }
+        }
+
         size_type size_;
         /**
-         * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree for clear
+         * @brief if comparator_ throws it's fine, it's not used in tree balancing and wont invalidate tree
          */
         Compare comparator_;
         allocator_type alloc_;
@@ -857,5 +894,4 @@ namespace s21{
     };
 
 } //namespace s21
-///there is a nuance. set<const T, U> will work like a map without some map functional. On the other hand, wtf is set<const T, U>
 #endif //S21_CONTAINERS_S21_SET_H_

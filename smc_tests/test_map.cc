@@ -190,3 +190,34 @@ TEST_F(MapTestFrozen, insert_or_assigns){
 
 }
 
+TEST_F(MapTestFrozen, swap){
+
+    auto s_copy1(map_s_s);
+    s21::map<std::string, s21::set<int>, std::less<>, std::allocator<std::pair<const std::string, s21::set<int>>>> map_swapp{std::make_pair("qq", s21::set<int>()), std::make_pair("ohno", s21::set<int>({-555})), std::make_pair("qwerty", s21::set<int>({1,3,55,65}))};
+    auto s_copy2(map_swapp);
+    map_s_s.swap(map_swapp);
+
+    ASSERT_EQ(map_swapp, s_copy1);
+    ASSERT_EQ(map_s_s, s_copy2);
+
+}
+
+TEST_F(MapTestFrozen, merge){
+
+    std::map<std::string, s21::set<int>> s_copy1(map_s_s.begin(), map_s_s.end());
+    s21::map<std::string, s21::set<int>, std::less<>, std::allocator<std::pair<const std::string, s21::set<int>>>> map_merge{std::make_pair("qq", s21::set<int>()), std::make_pair("ohno", s21::set<int>({-555})), std::make_pair("qwerty", s21::set<int>({1,3,55,65}))};
+    std::map<std::string, s21::set<int>> s_copy2(map_merge.begin(), map_merge.end());
+
+    map_s_s.merge(map_merge);
+    s_copy1.merge(s_copy2);
+
+    auto it1 = s_copy1.begin();
+    auto it2 = s_copy2.begin();
+    for(const auto& v: map_s_s){
+        ASSERT_EQ(*it1++, v);
+    }
+    for(const auto& v: map_merge){
+        ASSERT_EQ(*it2++, v);
+    }
+
+}

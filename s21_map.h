@@ -10,6 +10,7 @@ namespace s21 {
         using Base = set<std::pair<const Key, T>, Compare, Alloc>;
         using key_type = Key;
         using mapped_type = T;
+        using key_compare = Compare;
         using value_type = std::pair<const key_type, mapped_type>;
         using reference = value_type &;
         using const_reference = const value_type &;
@@ -21,7 +22,6 @@ namespace s21 {
 
         using Base::Base;
         using Base::insert;
-        using Base::erase;
 
         map(const map &m) : Base(m) {}
 
@@ -59,38 +59,11 @@ namespace s21 {
         ~map() = default;
 
         /**
-         * @brief returns iterator to element with Key key or past-end iterator
-         */
-        iterator find(const key_type &key) {
-            ///not just using std::make_pair(key, mapped_type()) here because it will not compile if mapped_type has no default constructor
-            ///operator new for mapped_type might cause unitialized read keks, easier to rewrite search for key only
-            return iterator(MapSearch(key));
-        }
-
-        /**
-        * @brief returns const_iterator to element with Key key  or past-end iterator
-        */
-        const_iterator find(const key_type &key) const {
-            return const_iterator(MapSearch(key));
-        }
-
-
-
-        /**
-         * @brief erases element with Key key. If element doesn't exist does nothing
-         */
-        void erase(const key_type &key) {
-            auto it = find(key);
-            if(it != Base::end())
-                erase(it);
-        }
-
-        /**
         * @brief returns const reference to object mapped to key
         * if no such key exists throws
         */
         const mapped_type &at(const key_type &key) const {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 throw std::out_of_range("No element with such key");
             } else {
@@ -103,7 +76,7 @@ namespace s21 {
          * if no such key exists throws
          */
         mapped_type &at(const key_type &key) {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 throw std::out_of_range("No element with such key");
             } else {
@@ -117,7 +90,7 @@ namespace s21 {
          * performing an insertion if such key does not already exist.
          */
         mapped_type &operator[](const Key &key) {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, T())).first->second;
             } else {
@@ -131,7 +104,7 @@ namespace s21 {
          * performing an insertion if such key does not already exist.
          */
         mapped_type &operator[](Key &&key) {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(std::move(key), T())).first->second;
             } else {
@@ -164,7 +137,7 @@ namespace s21 {
          */
         template <class M>
         std::pair<iterator, bool> insert_or_assign(const key_type& key, M&& obj) {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(key, std::forward<M>(obj)));
             } else {
@@ -178,7 +151,7 @@ namespace s21 {
          */
         template <class M>
         std::pair<iterator, bool> insert_or_assign(key_type&& key, M&& obj) {
-            auto it = find(key);
+            auto it = Base::find(key);
             if (it == Base::end()) {
                 return insert(std::make_pair(std::move(key), std::forward<M>(obj)));
             } else {
@@ -187,30 +160,15 @@ namespace s21 {
             }
         }
 
-        bool contains(const key_type &key) const noexcept {
-            return find(key) != Base::end();
+        void swap(map& other){
+            Base::swap(other);
         }
 
-    protected:
-
-        typename Base::Node* MapSearch(const key_type& key) const noexcept{
-                typename Base::Node *tmp = Base::fake_root_->__left_;
-                while (tmp) {
-                    if (Base::comparator_(key, tmp->__key_.first)) {
-                        tmp = tmp->__left_;
-                    } else if (Base::comparator_(tmp->__key_.first, key)) {
-                        tmp = tmp->__right_;
-                    } else {
-                        return tmp;
-                    }
-                }
-                return Base::fake_root_;
-            }
-
+        void merge(map& other){
+            Base::merge(other);
+        }
 
     };
-
-
 
 }//namespace s21
 #endif //S21_CONTAINERS_S21_MAP_H_
