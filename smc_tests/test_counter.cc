@@ -3,27 +3,26 @@
 #include "../s21_counter.h"
 #include "s21_matrix_oop.h"
 
-//class CounterTestFrozen :  public ::testing::Test {
-//protected:
-//
-//    void SetUp() override{
-//        map_m_ndd.insert({std::make_pair(S21::S21Matrix(), s21::NoDefaultDummyT(3)), std::make_pair(S21::S21Matrix(15,15),s21::NoDefaultDummyT(33)), std::make_pair(S21::S21Matrix(4,4), s21::NoDefaultDummyT(333)), std::make_pair(S21::S21Matrix(7,7), s21::NoDefaultDummyT(-33))});
-//        map_s_s.insert({std::make_pair("aboba", s21::set<int>()), std::make_pair("biba", s21::set<int>({1,2,3,4,5})), std::make_pair("boba", s21::set<int>({-7, 77, 887})), std::make_pair("boob", s21::set<int>({1,2}))});
-//        map_d_v.insert({std::make_pair(s21::NoDefaultDummyT(3), std::vector<int>()), std::make_pair(s21::NoDefaultDummyT(1), std::vector<int>({1,2,3,4,5})), std::make_pair(s21::NoDefaultDummyT(2), std::vector<int>({1,2,3})), std::make_pair(s21::NoDefaultDummyT(53), std::vector<int>({2,2}))});
-//
-//    }
-//
-//    void TearDown() override {
-//        map_m_ndd.clear();
-//        map_s_s.clear();
-//        map_d_v.clear();
-//
-//    }
-//
-//    s21::map<S21::S21Matrix, s21::NoDefaultDummyT> map_m_ndd;
-//    s21::map<std::string, s21::set<int>, std::less<>, std::allocator<std::pair<const std::string, s21::set<int>>>> map_s_s;
-//    s21::map<s21::NoDefaultDummyT, std::vector<int>, std::greater<>>map_d_v;
-//};
+class CounterTestFrozen :  public ::testing::Test {
+protected:
+
+    void SetUp() override{
+        c_matrix.insert({std::make_pair(S21::S21Matrix(), 555), std::make_pair(S21::S21Matrix(), 666), std::make_pair(S21::S21Matrix(3,3), 1), std::make_pair(S21::S21Matrix(5,5), 4), std::make_pair(S21::S21Matrix(7,7), 2)});
+        c_string_grt_stdal.insert({std::make_pair("aboba" , 35), std::make_pair("aboba", 10), std::make_pair("aboba", 1), std::make_pair("abooba", 22), std::make_pair("boba", 2), std::make_pair("boba", 11), std::make_pair("limpapopa", 1)});
+        c_vector.insert({std::make_pair(std::vector<int>(15), 13), std::make_pair(std::vector<int>{1,2,3,4,5}, 55), std::make_pair(std::vector<int>(), 1)});
+    }
+
+    void TearDown() override {
+        c_matrix.clear();
+        c_string_grt_stdal.clear();
+        c_vector.clear();
+
+    }
+
+    s21::Counter<S21::S21Matrix> c_matrix;
+    s21::Counter<std::string, std::greater<>, std::allocator<std::pair<const std::string, int>>> c_string_grt_stdal;
+    s21::Counter<std::vector<int>> c_vector;
+};
 
 TEST(CounterOnlyConstructors, key_type_inilist){
 
@@ -32,6 +31,16 @@ TEST(CounterOnlyConstructors, key_type_inilist){
 
     s21::Counter<S21::S21Matrix, std::greater<>, std::allocator<std::pair<const S21::S21Matrix, int>>> aboba{S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(3,3), S21::S21Matrix(5,5), S21::S21Matrix(7,7)};
     ASSERT_EQ(aboba[S21::S21Matrix()], 3);
+
+}
+
+TEST(CounterOnlyConstructors, value_type_inilist){
+
+    s21::Counter<std::string> biba{std::make_pair("aboba" , 35), std::make_pair("aboba", 10), std::make_pair("aboba", 1), std::make_pair("abooba", 22), std::make_pair("boba", 2), std::make_pair("boba", 11), std::make_pair("limpapopa", 1)};
+    ASSERT_EQ(biba["aboba"], 46);
+
+    s21::Counter<S21::S21Matrix, std::greater<>, std::allocator<std::pair<const S21::S21Matrix, int>>> aboba{std::make_pair(S21::S21Matrix(), 555), std::make_pair(S21::S21Matrix(), 666), std::make_pair(S21::S21Matrix(3,3), 1), std::make_pair(S21::S21Matrix(5,5), 4), std::make_pair(S21::S21Matrix(7,7), 2)};
+    ASSERT_EQ(aboba[S21::S21Matrix()], 1225);
 
 }
 
@@ -98,5 +107,53 @@ TEST(CounterOnlyConstructors, move_assign){
 
     ASSERT_EQ(biba_moved, biba_clone);
     ASSERT_EQ(aboba_moved, aboba_clone);
+
+}
+
+TEST_F(CounterTestFrozen, insert_pair){
+
+    S21::S21Matrix ins(14,14);
+
+    ASSERT_EQ((++c_matrix.begin())->second, 1225);
+    ASSERT_EQ(c_matrix.insert(std::make_pair(S21::S21Matrix(), 5))->second, 1230);
+    ASSERT_TRUE(!c_matrix.contains(S21::S21Matrix(20, 20)));
+    ASSERT_EQ(c_matrix.insert(std::make_pair(S21::S21Matrix(20,20), 5))->second, 5);
+
+
+    ASSERT_TRUE(!c_matrix.contains(ins));
+    ASSERT_EQ(c_matrix.insert(std::make_pair(ins, 15))->second, 15);
+    ASSERT_TRUE(c_matrix.contains(ins));
+    ASSERT_EQ(c_matrix.insert(std::make_pair(ins, 444))->second, 459);
+
+
+    std::string aboba("aboba");
+    ASSERT_EQ((--c_string_grt_stdal.end())->first, aboba);
+    ASSERT_EQ((--c_string_grt_stdal.end())->second, 46);
+    ASSERT_EQ(c_string_grt_stdal.insert("aboba", 14)->second, 60);
+    c_string_grt_stdal.clear();
+    ASSERT_TRUE(!c_string_grt_stdal.contains(aboba));
+    ASSERT_EQ(c_string_grt_stdal.insert("aboba", 2)->second, 2);
+    ASSERT_ANY_THROW(c_string_grt_stdal.insert("aboba", -55));
+    ASSERT_EQ(c_string_grt_stdal.insert(aboba, 2)->second, 4);
+
+}
+
+TEST_F(CounterTestFrozen, insert_key){
+
+    S21::S21Matrix ins(14,14);
+    ASSERT_EQ(c_matrix.insert(ins)->second, 1);
+    ASSERT_EQ(c_matrix.insert(ins)->second, 2);
+    ASSERT_EQ(c_matrix.insert(S21::S21Matrix(8,8))->second, 1);
+    ASSERT_EQ(c_matrix.insert(S21::S21Matrix(8,8))->second, 2);
+
+}
+
+TEST_F(CounterTestFrozen, erase_key_count){
+
+    ASSERT_EQ((++c_matrix.begin())->second, 1225);
+    c_matrix.erase((++c_matrix.begin())->first, 1220);
+    ASSERT_EQ((++c_matrix.begin())->second, 5);
+    c_matrix.erase((++c_matrix.begin())->first, 55);
+    ASSERT_TRUE(!c_matrix.contains(S21::S21Matrix()));
 
 }

@@ -2,8 +2,11 @@
 #define S21_CONTAINERS_S21_COUNTER_H_
 
 #include "s21_map.h"
+#include <vector>
+#include <queue>
 
 namespace s21{
+    ///attempt at Python Counter based on tree Structure. Because unlinke multiset it's cool
     template<typename Key, typename Compare = MyComparator<Key>, typename Allocator = MyTreeAllocator<std::pair<const Key, int>>>
     class Counter : public map<Key, int, Compare, Allocator>{
     public:
@@ -21,9 +24,11 @@ namespace s21{
         using Base::erase;
 
         Counter(std::initializer_list<key_type> ilist){
-            for(auto& val : ilist){
-                insert(std::move(val));
-            }
+            insert(ilist);
+        }
+
+        Counter(std::initializer_list<value_type> ilist){
+            insert(ilist);
         }
 
         Counter(const Counter &c) : Base(c) {}
@@ -108,33 +113,51 @@ namespace s21{
             }
             return *this;
         }
-
+        /**
+         * @brief substract count from Key. If key count drops to 0 it is erased
+         * @param Key Count pair
+         */
         Counter& operator-=(const value_type& value){
             erase(value.first, value.second);
             return *this;
         }
-
+        /**
+         * @brief adds count to the Key.
+         * @param Key Count pair
+         */
         Counter& operator+=(const value_type& value){
             insert(value.first, value.second);
             return *this;
         }
 
+        /**
+         * @brief substract count from Key. If key count drops to 0 it is erased
+         * @param Key Count pair
+         * @return resulting Counter
+         */
         Counter operator-(const value_type& value){
             auto result(*this);
             result -= value;
             return result;
         }
-
+        /**
+         * @brief adds count to the Key.
+         * @param Key Count pair
+         * @return resulting Counter
+         */
         Counter operator+(const value_type& value){
             auto result(*this);
             result += value;
             return result;
         }
 
-
+        /**
+         * @brief inserts Key count pair into the Counter. If key already exists adds count to Key\n
+         * throws if count is negative
+         */
         iterator insert(const value_type& value) {
             if(value.second <= 0){
-                throw std::logic_error("can't insert negative amount of keys");
+                throw std::logic_error("can't insert negative amount of zero keys");
             }
             auto it = Base::find(value.first);
             if(it == Base::end()){
@@ -143,10 +166,13 @@ namespace s21{
             it->second += value.second;
             return it;
         }
-
+        /**
+         * @brief inserts Key count pair into the Counter. If key already exists adds count to Key\n
+         * throws if count is negative
+         */
         iterator insert(value_type&& value) {
             if(value.second <= 0){
-                throw std::logic_error("can't insert negative amount of keys");
+                throw std::logic_error("can't insert negative amount of zero keys");
             }
             auto it = Base::find(value.first);
             if(it == Base::end()){
@@ -155,7 +181,9 @@ namespace s21{
             it->second += value.second;
             return it;
         }
-
+        /**
+         * @brief inserts Key into the Counter.
+         */
         iterator insert(const key_type& value) {
             auto it = Base::find(value);
             if(it == Base::end()){
@@ -164,7 +192,9 @@ namespace s21{
             it->second += 1;
             return it;
         }
-
+        /**
+         * @brief inserts Key into the Counter.
+         */
         iterator insert(key_type&& value) {
             auto it = Base::find(value);
             if(it == Base::end()){
@@ -173,9 +203,40 @@ namespace s21{
             it->second += 1;
             return it;
         }
+        /**
+         * @brief inserts Key count pair into the Counter. If key already exists adds count to Key\n
+         * throws if count is negative
+         */
+        iterator insert(const key_type& key, const int count){
+            return insert(std::make_pair(key, count));
+
+        }
+        /**
+         * @brief inserts Key count pair into the Counter. If key already exists adds count to Key\n
+         * throws if count is negative
+         */
+        iterator insert(key_type&& key, const int count){
+            return insert(std::make_pair(std::move(key), count));
+        }
+        /**
+        * @brief inserts Keys into the Counter
+        */
+        void insert(std::initializer_list<key_type> ilist){
+            for(auto& val : ilist){
+                insert(std::move(val));
+            }
+        }
+        /**
+         * @brief inserts Key, count pairs to the Counter. If key already exists adds count to Key
+         */
+        void insert(std::initializer_list<value_type> ilist) {
+            for(auto& val : ilist){
+                insert(std::move(val));
+            }
+        }
 
         /**
-         * @brief remove count from key element. if count drops to zero element is removed
+         * @brief remove count from key element. if count drops to zero the element is removed
          */
         void erase(const key_type& key, const int count){
             auto it = Base::find(key);
@@ -188,23 +249,51 @@ namespace s21{
         /**
          * @brief returns set based on Counter (no duplicates)
          */
-        s21::set<Key, Compare, Allocator>& to_set(){
+        s21::set<Key, Compare, Allocator>& to_set() const{
             return s21::set<Key, Compare, Allocator>(Base::begin(), Base::end());
         }
         /**
          * @brief returns <Key, int> map based on Counter
          */
-         Base& to_map(){
+         Base& to_map() const{
              return s21::map<Key, int, Compare, Allocator>(Base::begin(), Base::end());
          }
-
-        iterator insert(const key_type& key, const int count){
-            return insert(std::make_pair(key, count));
-
+        /**
+        * @brief returns vector with duplicate elements
+        */
+        std::vector<Key>& to_vector() const{
+            size_type counter;
+            std::vector<Key> result;
+            for(const auto& [k,v] : *this){
+                for(counter = v; v > 0; v--){
+                    result.push_back(k);
+                }
+            }
+            return result;
         }
-        iterator insert(key_type&& key, const int count){
-            return insert(std::make_pair(std::move(key), count));
-        }
+        /**
+         * @brief returns heap with flipped pair (count as first element)
+         * @param comparator for heap.
+         */
+         template<typename Comparator>
+        std::priority_queue<std::pair<int, Key>, Comparator>& to_heap(const Comparator& comp) const{
+            std::priority_queue<std::pair<int, Key>, Comparator> result(comp);
+            for(const auto& [k,v] : *this){
+                result.push_back(std::make_pair(v,k));
+            }
+            return result;
+         }
+         /**
+        * @brief returns heap with flipped pair (count as first element)\n
+        * by default uses std::less<>
+        */
+         std::priority_queue<std::pair<int, Key>>& to_heap() const{
+             std::priority_queue<std::pair<int, Key>> result;
+             for(const auto& [k,v] : *this){
+                 result.push_back(std::make_pair(v,k));
+             }
+             return result;
+         }
 
     };
 
