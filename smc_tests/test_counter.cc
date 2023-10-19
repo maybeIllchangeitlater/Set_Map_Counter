@@ -156,4 +156,92 @@ TEST_F(CounterTestFrozen, erase_key_count){
     c_matrix.erase((++c_matrix.begin())->first, 55);
     ASSERT_TRUE(!c_matrix.contains(S21::S21Matrix()));
 
+    ASSERT_EQ(c_string_grt_stdal["boba"], 13);
+    c_string_grt_stdal.erase(std::make_pair("boba", 5));
+    ASSERT_EQ(c_string_grt_stdal["boba"], 8);
+
+}
+
+
+TEST_F(CounterTestFrozen, to_map){
+
+    auto mapped = c_string_grt_stdal.to_map();
+    auto it = c_string_grt_stdal.cbegin();
+    for(const auto&[k,v]: mapped){
+        ASSERT_EQ(it->first, k);
+        ASSERT_EQ(it++->second, v);
+    }
+
+}
+
+TEST_F(CounterTestFrozen, to_set){
+
+    auto setted = c_matrix.to_set();
+    auto it = c_matrix.cbegin();
+    for(const auto& k: setted){
+        ASSERT_EQ(it++->first, k);
+    }
+
+}
+
+TEST_F(CounterTestFrozen, to_vector){
+
+    auto vec_s = c_string_grt_stdal.to_vector();
+    ASSERT_EQ(std::count(vec_s.begin(), vec_s.end(), "aboba"), 46);
+
+}
+
+TEST_F(CounterTestFrozen, to_heap){
+    std::string limpapopa("limpapopa");
+    auto heap_matrix = c_matrix.to_heap();
+    auto heap_string = c_string_grt_stdal.to_heap(std::greater<>());
+
+    ASSERT_EQ(heap_matrix.top(), std::make_pair(1225, S21::S21Matrix()));
+    heap_matrix.pop();
+    ASSERT_EQ(heap_matrix.top(), std::make_pair(2, S21::S21Matrix(7,7)));
+
+    ASSERT_EQ(heap_string.top(), std::make_pair(1, limpapopa));
+    heap_string.pop();
+
+}
+
+TEST_F(CounterTestFrozen, operators_with_other_counter){
+
+    s21::Counter<S21::S21Matrix> target{S21::S21Matrix(), S21::S21Matrix(2, 2), S21::S21Matrix(3,3), S21::S21Matrix(4,4), S21::S21Matrix(5,5), S21::S21Matrix(6,6), S21::S21Matrix(12,12), S21::S21Matrix(7,7), S21::S21Matrix(10,10), S21::S21Matrix(8,8),
+                                        S21::S21Matrix(14,14), S21::S21Matrix(14,14),
+                                        S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(),
+                                        S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(),
+                                        S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix(), S21::S21Matrix()};
+
+    auto res = target + c_matrix;
+    ASSERT_EQ(res[S21::S21Matrix()], target[S21::S21Matrix()] + c_matrix[S21::S21Matrix()]);
+
+    c_matrix += target;
+
+    ASSERT_EQ(c_matrix, res);
+
+    auto res2 = c_matrix - target - target;
+    ASSERT_TRUE(!res2.contains(S21::S21Matrix(3,3)));
+    ASSERT_EQ(res2[S21::S21Matrix(7, 7)], 1);
+
+    c_matrix -= res;
+    ASSERT_TRUE(c_matrix.empty());
+    
+}
+
+TEST_F(CounterTestFrozen, operators_with_pairs){
+
+
+    auto res = c_matrix - std::make_pair(S21::S21Matrix(), 10000);
+    ASSERT_TRUE(!res.contains(S21::S21Matrix()));
+
+    c_matrix -= std::make_pair(S21::S21Matrix(), 10000);
+    ASSERT_EQ(res, c_matrix);
+
+    auto res2 = c_matrix + std::make_pair(S21::S21Matrix(), 10000);
+    ASSERT_EQ(res2[S21::S21Matrix()], 10000);
+    c_matrix += std::make_pair(S21::S21Matrix(), 10000);
+    ASSERT_EQ(res2, c_matrix);
+
+
 }

@@ -203,7 +203,7 @@ namespace s21{
         set(std::initializer_list<value_type> init, const Allocator& alloc) : set(init, Compare(), alloc) {}
 
         template<typename InputIt>
-        set(InputIt first, InputIt last){
+        set(InputIt first, InputIt last) : set(){
             if constexpr (std::is_base_of_v<std::input_iterator_tag, typename std::iterator_traits<InputIt>::iterator_category>) {
                 for (InputIt it = first; it != last;++it){
                     Append(*it);

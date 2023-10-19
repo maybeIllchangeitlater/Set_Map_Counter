@@ -84,7 +84,7 @@ namespace s21{
          */
         Counter& operator+=(Counter& other){
             for(const auto&[k, v] : other){
-                *this->operator[](k)+=v;
+                this->operator[](k)+=v;
             }
             return *this;
         }
@@ -103,8 +103,8 @@ namespace s21{
          */
         Counter& operator-=(Counter& other){
             for(const auto&[k, v] : other){
-                *this->operator[](k)-=v;
-                if(*this->operator[](k) <= 0)
+                this->operator[](k)-=v;
+                if(this->operator[](k) <= 0)
                     erase(k);
             }
             return *this;
@@ -251,23 +251,27 @@ namespace s21{
         /**
          * @brief returns set based on Counter (no duplicates)
          */
-        s21::set<Key, Compare, Allocator>& to_set() const{
-            return s21::set<Key, Compare, Allocator>(Base::begin(), Base::end());
+        s21::set<Key, Compare, std::allocator<Key>> to_set() const{
+            s21::set<Key, Compare, std::allocator<Key>> result;
+            for(const auto &[k,v] : *this){
+                result.insert(k);
+            }
+            return result;
         }
         /**
          * @brief returns <Key, int> map based on Counter
          */
-         Base& to_map() const{
+         Base to_map() const{
              return s21::map<Key, int, Compare, Allocator>(Base::begin(), Base::end());
          }
         /**
         * @brief returns vector with duplicate elements
         */
-        std::vector<Key>& to_vector() const{
+        std::vector<Key> to_vector() const{
             size_type counter;
             std::vector<Key> result;
             for(const auto& [k,v] : *this){
-                for(counter = v; v > 0; v--){
+                for(counter = v; counter > 0; counter--){
                     result.push_back(k);
                 }
             }
@@ -277,22 +281,22 @@ namespace s21{
          * @brief returns heap with flipped pair (count as first element)
          * @param comparator for heap.
          */
-         template<typename Comparator>
-        std::priority_queue<std::pair<int, Key>, Comparator>& to_heap(const Comparator& comp) const{
-            std::priority_queue<std::pair<int, Key>, Comparator> result(comp);
-            for(const auto& [k,v] : *this){
-                result.push_back(std::make_pair(v,k));
+        template <typename Comparator>
+        std::priority_queue<std::pair<int, Key>, std::vector<std::pair<int, Key>>, Comparator> to_heap(const Comparator& comp) const {
+            std::priority_queue<std::pair<int, Key>, std::vector<std::pair<int, Key>>, Comparator> result(comp);
+            for (const auto& [k, v] : *this) {
+                result.push(std::make_pair(v, k));
             }
             return result;
-         }
+        }
          /**
         * @brief returns heap with flipped pair (count as first element)\n
         * by default uses std::less<>
         */
-         std::priority_queue<std::pair<int, Key>>& to_heap() const{
+         std::priority_queue<std::pair<int, Key>> to_heap() const{
              std::priority_queue<std::pair<int, Key>> result;
              for(const auto& [k,v] : *this){
-                 result.push_back(std::make_pair(v,k));
+                 result.push(std::make_pair(v,k));
              }
              return result;
          }
